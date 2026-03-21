@@ -1,0 +1,4 @@
+{
+    "clangd.arguments": ["--header-insertion=never"],
+    "cmake.copyCompileCommands": "${workspaceFolder}/build/compile_commands.json"
+}
