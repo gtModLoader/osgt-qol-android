@@ -1,1 +1,2 @@
 add_subdirectory(And64InlineHook)
+add_subdirectory(boost)
