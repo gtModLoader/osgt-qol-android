@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <string>
 
 // We don't need full-fat CL_Vec classes, use more lean structs.

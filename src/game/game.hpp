@@ -1,6 +1,10 @@
 #pragma once
 #include "And64InlineHook.hpp"
+#include "game/struct/variant.hpp"
+#include <dlfcn.h>
+#include <link.h>
 #include <string>
+
 
 // Utility macro for easy declaration of game functions. This will create a global function pointer
 // alias called <name>_t, and create an instance of said function pointer in the real namespace.
@@ -65,12 +69,219 @@ class GameHarness
     void operator=(GameHarness const&) = delete;
 
   private:
-    // Image size (size of the game image in memory).
-    size_t imageSize;
-
     void* handle;
 
     GameHarness() = default;
+};
+
+// Responsible for providing a stable API for patches to add in-game options with
+typedef void (*VariantCallback)(Variant*);
+typedef void (*VariantListCallback)(VariantList*);
+class OptionsManager
+{
+  public:
+    enum GameOptionType : uint8_t
+    {
+        OPTION_SLIDER,
+        OPTION_CHECKBOX,
+        OPTION_MULTICHOICE,
+        OPTION_MULTICHOICE_DUALBUTTONS
+    };
+    struct GameOption
+    {
+        OptionsManager::GameOptionType type;
+        std::string varName;
+        std::string displayName;
+        std::string extraInfo;
+        std::vector<std::string>* displayOptions;
+        float vModSizeX = 0;
+        void* signal;
+    };
+    struct OptionsPage
+    {
+        std::string fancyName;
+        std::map<std::string, std::vector<GameOption>> sections;
+    };
+    // Get OptionsManager instance
+    static OptionsManager& get();
+
+    // Initialize OptionsManager. This has to be invoked after GameHarness has finished
+    // initialization and the game window has been hidden for patching.
+    // This will resolve and hook all the functions needed to provide an API for patches to create
+    // their own options with.
+    void initialize();
+
+    // Creates an option page with fancy name
+    void addOptionPage(std::string ID, std::string displayName) { optionPages[ID].fancyName = displayName; }
+
+    // Adds a slider option to end of GameOptions list.
+    // varName is points to a variable in save.dat.
+    // displayName is the string visible in middle of a slider option.
+    void addSliderOption(std::string varName, std::string displayName, VariantCallback pCallback,
+                         std::string hintStr = "")
+    {
+        GameOption option;
+        option.type = OPTION_SLIDER;
+        option.varName = varName;
+        option.displayName = displayName;
+        option.signal = (void*)pCallback;
+        option.extraInfo = hintStr;
+        rootOptions.push_back(option);
+    }
+
+    void addSliderOption(std::string page, std::string section, std::string varName, std::string displayName,
+                         VariantCallback pCallback, std::string hintStr = "")
+    {
+#ifdef DEBUG
+        if (optionPages.find(page) == optionPages.end())
+        {
+            printf("[WARN] Added a slider option to page %s on section %s, but page doesn't exist. "
+                   "Using the ID as name.\n",
+                   page, section);
+        }
+#endif
+        GameOption option;
+        option.type = OPTION_SLIDER;
+        option.varName = varName;
+        option.displayName = displayName;
+        option.signal = (void*)pCallback;
+        option.extraInfo = hintStr;
+        optionPages[page].sections[section].push_back(option);
+    }
+
+    // Adds a checkbox option to end of GameOptions list.
+    // varName is points to a variable in save.dat.
+    // displayName is the string visibile directly next to the checkbox.
+    void addCheckboxOption(std::string varName, std::string displayName, VariantListCallback pCallback)
+    {
+        GameOption option;
+        option.type = OPTION_CHECKBOX;
+        option.varName = varName;
+        option.displayName = displayName;
+        option.signal = (void*)pCallback;
+        rootOptions.push_back(option);
+    }
+    void addCheckboxOption(std::string page, std::string section, std::string varName, std::string displayName,
+                           VariantListCallback pCallback)
+    {
+#ifdef DEBUG
+        if (optionPages.find(page) == optionPages.end())
+        {
+            printf("[WARN] Added a slider option to page %s on section %s, but page doesn't exist. "
+                   "Using the ID as name.\n",
+                   page, section);
+        }
+#endif
+        GameOption option;
+        option.type = OPTION_CHECKBOX;
+        option.varName = varName;
+        option.displayName = displayName;
+        option.signal = (void*)pCallback;
+        optionPages[page].sections[section].push_back(option);
+    }
+
+    // Adds a multi-choice option to end of GameOptions list.
+    // varName points to a variable in save.dat.
+    // displayName is the string visible above the multichoice option.
+    // displayOptions is the "pretty name" corresponding to the numeric variable.
+    // vModSizeX is optional parameter if you need larger size than vSizeX 180
+    // Draws an option that looks roughly:
+    // displayName
+    // [<] [ displayOptions[var] ] [>]
+    void addMultiChoiceOption(std::string varName, std::string displayName, std::vector<std::string>& displayOptions,
+                              VariantListCallback pCallback, float vModSizeX = 0, std::string hintStr = "")
+    {
+        GameOption option;
+        option.type = OPTION_MULTICHOICE;
+        option.varName = varName;
+        option.displayName = displayName;
+        option.displayOptions = &displayOptions;
+        option.signal = (void*)pCallback;
+        option.vModSizeX = vModSizeX;
+        option.extraInfo = hintStr;
+        rootOptions.push_back(option);
+    }
+    void addMultiChoiceOption(std::string page, std::string section, std::string varName, std::string displayName,
+                              std::vector<std::string>& displayOptions, VariantListCallback pCallback,
+                              float vModSizeX = 0, std::string hintStr = "")
+    {
+#ifdef DEBUG
+        if (optionPages.find(page) == optionPages.end())
+        {
+            printf("[WARN] Added a slider option to page %s on section %s, but page doesn't exist. "
+                   "Using the ID as name.\n",
+                   page, section);
+        }
+        else
+        {
+            if (optionPages[page].sections.find(section) == optionPages[page].sections.end())
+            {
+                printf("[WARN] Added a slider option to page %s on section %s, but section doesn't "
+                       "exist. Using the ID as name.\n",
+                       page, section);
+            }
+        }
+#endif
+        GameOption option;
+        option.type = OPTION_MULTICHOICE;
+        option.varName = varName;
+        option.displayName = displayName;
+        option.displayOptions = &displayOptions;
+        option.signal = (void*)pCallback;
+        option.vModSizeX = vModSizeX;
+        option.extraInfo = hintStr;
+        optionPages[page].sections[section].push_back(option);
+    }
+
+    void addMultiChoiceOptionDoubleButtons(std::string page, std::string section, std::string varName,
+                                           std::string displayName, std::vector<std::string>& displayOptions,
+                                           VariantListCallback pCallback, float vModSizeX = 0, std::string hintStr = "")
+    {
+#ifdef DEBUG
+        if (optionPages.find(page) == optionPages.end())
+        {
+            printf("[WARN] Added a slider option to page %s on section %s, but page doesn't exist. "
+                   "Using the ID as name.\n",
+                   page, section);
+        }
+        else
+        {
+            if (optionPages[page].sections.find(section) == optionPages[page].sections.end())
+            {
+                printf("[WARN] Added a slider option to page %s on section %s, but section doesn't "
+                       "exist. Using the ID as name.\n",
+                       page, section);
+            }
+        }
+#endif
+        GameOption option;
+        option.type = OPTION_MULTICHOICE_DUALBUTTONS;
+        option.varName = varName;
+        option.displayName = displayName;
+        option.displayOptions = &displayOptions;
+        option.signal = (void*)pCallback;
+        option.vModSizeX = vModSizeX;
+        option.extraInfo = hintStr;
+        optionPages[page].sections[section].push_back(option);
+    }
+
+    // All of the custom options we have made are stored here.
+    std::vector<GameOption> rootOptions;
+    std::map<std::string, OptionsPage> optionPages;
+
+  private:
+    // Helper functions called during the hook to render our options.
+    static void renderSlider(OptionsManager::GameOption& optionDef, void* pEntPtr, float vPosX, float& vPosY);
+    static void renderCheckbox(OptionsManager::GameOption& optionDef, void* pEntPtr, float vPosX, float& vPosY);
+    static void renderMultiChoice(OptionsManager::GameOption& optionDef, void* pEntPtr, float vPosX, float& vPosY);
+    static void HandleOptionPageButton(VariantList* pVL);
+    static void HandleOptionPageScrollButton(VariantList* pVL);
+
+    // Used in hooks
+    static void OptionsMenuAddContent(void* pEnt, void* unk2, void* unk3, void* unk4);
+    static void OptionsMenuOnSelect(void* pVList);
+    static void OnMenuButtonPressed(VariantList*);
+    static void OnGemButtonPressed(VariantList*);
 };
 
 } // namespace game

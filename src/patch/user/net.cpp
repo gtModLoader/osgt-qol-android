@@ -1,16 +1,15 @@
 #include "game/game.hpp"
 #include "game/signatures.hpp"
+#include "game/struct/entity.hpp"
 #include "game/struct/variant.hpp"
 #include "patch/patch.hpp"
-#include "game/struct/entity.hpp"
+
 
 REGISTER_GAME_FUNCTION(OnlineMenuCreate, "_Z16OnlineMenuCreateP6Entity", Entity*, Entity*);
 REGISTER_GAME_FUNCTION(OnlineMenuOnConnect, "_Z19OnlineMenuOnConnectP6Entity", Entity*, Entity*);
-REGISTER_GAME_FUNCTION(Curl_getaddrinfo_ex, "Curl_getaddrinfo_ex", int, const char* host, const char* service,
-                       void* hints, void** res);
 REGISTER_GAME_FUNCTION(UbiservicesHTTPSOperationDoStart, "_ZN25UbiservicesHTTPSOperation7DoStartEv", void, void*);
 REGISTER_GAME_FUNCTION(UbiservicesHTTPSOperationSetServer, "_ZN25UbiservicesHTTPSOperation9SetServerERKSs", void, void*,
-                       void*);
+                       std::string const&);
 class ServerSwitcher : public patch::BasePatch
 {
   public:
@@ -35,11 +34,11 @@ class ServerSwitcher : public patch::BasePatch
 
     static void UbiservicesHTTPSOperationDoStart(void* this_)
     {
-        UbiString* uri = (UbiString*)(((int64_t)this_) + 0x80);
-        if (uri->getString() == "growtopia/server_data.php")
+        std::string& uri = *(std::string*)(((int64_t)this_) + 0x80);
+        if (uri == "growtopia/server_data.php")
         {
-            real::UbiservicesHTTPSOperationSetServer(
-                this_, UbiString(real::GetApp()->GetVar("osgt_qol_server_hostname")->GetString()));
+            real::UbiservicesHTTPSOperationSetServer(this_,
+                                                     real::GetApp()->GetVar("osgt_qol_server_hostname")->GetString());
             real::LogToConsole(std::string("Using `w" +
                                            real::GetApp()->GetVar("osgt_qol_server_hostname")->GetString() +
                                            "`` as the server data provider...")
@@ -65,8 +64,8 @@ class ServerSwitcher : public patch::BasePatch
         float marginX = pOnlineMenu->GetEntityByName("text")->GetVar("pos2d")->GetVector2().x;
 
         // Create our very own label
-        Entity* pServerLabel = real::CreateTextLabelEntity(pOnlineMenu, UbiString("osgt_qol_server_label"), marginX,
-                                                           marginY - 2.0f, UbiString("Server Data Location"));
+        Entity* pServerLabel = real::CreateTextLabelEntity(pOnlineMenu, "osgt_qol_server_label", marginX,
+                                                           marginY - 2.0f, "Server Data Location");
         // We need to call SetupTextEntity so it scales and lines up with the rest of UI.
         real::SetupTextEntity(pServerLabel, fontID, fontScale);
 
@@ -87,7 +86,6 @@ class ServerSwitcher : public patch::BasePatch
         // InputTextEntity is still an TextEntity, we have to scale it to rest of UI with the helper
         // function.
         real::SetupTextEntity(pServerInput, fontID, fontScale);
-
         return pOnlineMenu;
     }
 
@@ -111,7 +109,6 @@ class ServerSwitcher : public patch::BasePatch
         if (pServerInput != nullptr)
         {
             // If the patch takes too long to load, the element may not even exist.
-            LOG_DEBUG("found pServerInput");
             std::string userInput = pServerInput->GetComponentByName("InputTextRender")->GetVar("text")->GetString();
             if (userInput.size() != 0)
             {

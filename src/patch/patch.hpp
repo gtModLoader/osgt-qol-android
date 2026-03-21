@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
-#include <type_traits>
 #include <unordered_map>
+#include <vector>
+
 
 namespace patch
 {
@@ -31,7 +32,7 @@ class PatchManager
     // Register a new game patch.
     template <class T, PatchType P> inline void registerPatch(BasePatch* instance, const std::string& name)
     {
-        static_assert(std::is_base_of_v<BasePatch, T>, "T must derive from BasePatch.");
+        // static_assert(std::is_base_of_v<BasePatch, T>, "T must derive from BasePatch.");
         patchMap[name] = PatchInfo{instance, P};
     }
 
@@ -76,7 +77,7 @@ namespace internal
 // instead.
 template <class T, PatchType P> class RegisterPatch
 {
-    static_assert(std::is_base_of_v<BasePatch, T>, "T must derive from BasePatch.");
+    // static_assert(std::is_base_of_v<BasePatch, T>, "T must derive from BasePatch.");
 
   public:
     T instance;

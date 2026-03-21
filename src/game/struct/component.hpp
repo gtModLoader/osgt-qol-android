@@ -26,7 +26,7 @@ class EntityComponent
   private:
     void* trackable;
     void* smth_else;
-    UbiString* m_name;
+    std::string* m_name;
     Entity* m_parent;
     VariantDB m_sharedDB;
 };

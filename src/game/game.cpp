@@ -19,9 +19,6 @@ void GameHarness::initialize()
     }
 }
 
-void* GameHarness::resolveSymbol(std::string& pattern)
-{
-    return dlsym(handle, pattern.c_str());
-}
+void* GameHarness::resolveSymbol(std::string& pattern) { return dlsym(handle, pattern.c_str()); }
 
 } // namespace game

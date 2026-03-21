@@ -2,6 +2,7 @@
 #include "game/signatures.hpp"
 #include "game/struct/entity.hpp"
 #include "patch/patch.hpp"
+#include <string>
 #include <version.h>
 
 REGISTER_GAME_FUNCTION(AboutMenuAddScrollContent, "_Z15AboutMenuCreateP6Entity", Entity*, Entity*);
@@ -33,7 +34,7 @@ class AboutMenuAttribution : public patch::BasePatch
             if (pTextVariant != nullptr)
             {
                 // Set our attribution.
-                real::SetTextEntity(pTextBox2, UbiString(pTextVariant->GetString() + GetAttributionText()));
+                real::SetTextEntity(pTextBox2, pTextVariant->GetString() + GetAttributionText());
                 // Signal proton to resize the menu for our text to be visible.
                 VariantList vl(pScrollChild->GetParent()->GetParent());
                 real::ResizeScrollBounds(&vl);
@@ -59,7 +60,7 @@ class AboutMenuAttribution : public patch::BasePatch
             firstLine +
             "`6Original PC mod created by `wCernodile`` and `whouz``. Ported to Android by `wCernodile``."
             "\nThere are currently `w" +
-            std::to_string(patches.size()) + "`` patches applied: ";
+            toString(patches.size()) + "`` patches applied: ";
 
         // Create comma-separated list of patches.
         for (size_t i = 0; i < patches.size(); i++)

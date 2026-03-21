@@ -2,8 +2,10 @@
 #include "game/struct/variant.hpp"
 #include "game/struct/vec.hpp"
 
+#include "boost/signals2/trackable.hpp"
+
 // Namings matched.
-class Background
+class Background : public boost::signals2::trackable
 {
   public:
     Background();
@@ -22,9 +24,6 @@ class Background
     void OnAudioDisabled();
     void OnAudioEnabled();
 
-    void* trackable;
-    void* smth_else;
-
     bool m_scaleOnTheFly = false;
 
     // Used for the weather change animation/fade
@@ -38,4 +37,4 @@ class Background
     /*LoopingSound m_loopingSound;
     float m_sfxBaseVolume = 0.25f;*/
 };
-//static_assert(sizeof(Background) == 264, "Background class size mismatch.");
+// static_assert(sizeof(Background) == 264, "Background class size mismatch.");

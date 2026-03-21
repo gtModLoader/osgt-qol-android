@@ -1,7 +1,9 @@
 #pragma once
-#include "game/struct/ubistring.hpp"
+#include "game/struct/miscutils.hpp"
 #include "vec.hpp"
 #include <string>
+
+#include "boost/signals2.hpp"
 
 class Entity;
 class EntityComponent;
@@ -41,18 +43,13 @@ class Variant
     Variant(std::string const& var)
     {
         SetDefaults();
-        ((UbiString)m_string) = var;
+        m_string = var.c_str();
         m_type = TYPE_STRING;
     }
-    Variant(UbiString const& var)
+    Variant(const char* var)
     {
         SetDefaults();
-        ((UbiString)m_string) = var;
-        m_type = TYPE_STRING;
-    }
-    Variant(const char* var) {
-        SetDefaults();
-        ((UbiString)m_string) = var;
+        m_string = var;
         m_type = TYPE_STRING;
     }
     Variant(float x, float y)
@@ -97,7 +94,7 @@ class Variant
         // SAFE_DELETE(m_pSig_onChanged);
         if (m_pSig_onChanged)
         {
-            //delete m_pSig_onChanged;
+            m_pSig_onChanged.reset();
             m_pSig_onChanged = 0;
         }
     };
@@ -108,29 +105,29 @@ class Variant
         // SAFE_DELETE(m_pSig_onChanged);
         if (m_pSig_onChanged)
         {
-            //delete m_pSig_onChanged;
+            m_pSig_onChanged.reset();
             m_pSig_onChanged = 0;
         }
     }
 
-    /*boost::signal<void(Variant*)>* GetSigOnChanged()
+    boost::signals2::signal<void(Variant*)>* GetSigOnChanged()
     {
-        if (!m_pSig_onChanged)
+        if (!m_pSig_onChanged.get())
         {
-            m_pSig_onChanged = new boost::signal<void(Variant*)>;
+            m_pSig_onChanged = std::make_shared<boost::signals2::signal<void(Variant*)>>();
         }
-        return m_pSig_onChanged;
-    }*/
+        return m_pSig_onChanged.get();
+    }
 
-    //void Set(const Variant& v);
+    // void Set(const Variant& v);
     void SetVariant(Variant* pVar);
 
     void Set(float var)
     {
         m_type = TYPE_FLOAT;
         *((float*)m_var) = var;
-        //if (m_pSig_onChanged)
-        //    (*m_pSig_onChanged)(this);
+        if (m_pSig_onChanged)
+            (*m_pSig_onChanged)(this);
     }
 
     float& GetFloat()
@@ -205,24 +202,18 @@ class Variant
     void Set(const char* var)
     {
         m_type = TYPE_STRING;
-        *(UbiString*)&m_string = var;
-    }
-
-    void Set(std::string& var)
-    {
-        m_type = TYPE_STRING;
-        *(UbiString*)&m_string = var;
+        m_string = var;
     }
 
     void Set(std::string const& var)
     {
         m_type = TYPE_STRING;
-        *(UbiString*)&m_string = var;
+        m_string = var;
     }
 
-    std::string GetString() { return std::string(m_string); }
-    //const char* GetString() { return m_string; }
-    const char* GetString() const { return m_string; }
+    std::string GetString() { return m_string; }
+    // const char* GetString() { return m_string; }
+    const char* GetString() const { return m_string.c_str(); }
 
     void Set(CL_Vec2f const& var)
     {
@@ -274,7 +265,7 @@ class Variant
         switch (m_type)
         {
         case TYPE_FLOAT:
-            return std::to_string(*((float*)m_var));
+            return toString(*((float*)m_var));
             break;
         case TYPE_STRING:
             return m_string;
@@ -292,10 +283,10 @@ class Variant
             break;
         }
         case TYPE_UINT32:
-            return std::to_string(*(int32_t*)m_var);
+            return toString(*(int32_t*)m_var);
             break;
         case TYPE_INT32:
-            return std::to_string(*(int32_t*)m_var);
+            return toString(*(int32_t*)m_var);
             break;
         case TYPE_ENTITY:
             return "An entity";
@@ -320,7 +311,7 @@ class Variant
     void SetDefaults()
     {
         m_type = TYPE_UNUSED;
-        m_pSig_onChanged = NULL;
+        m_pSig_onChanged = 0;
     }
     eType m_type;
     void* m_pVoid;
@@ -331,9 +322,8 @@ class Variant
         uint32_t m_as_uint32s[4];
         int32_t m_as_int32s[4];
     };
-    const char* m_string;
-    void* m_pSig_onChanged;
-    void* munk;
+    std::string m_string;
+    std::shared_ptr<boost::signals2::signal<void(Variant*)>> m_pSig_onChanged;
 };
 
 class VariantList

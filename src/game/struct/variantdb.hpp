@@ -5,7 +5,7 @@
 class FunctionObject
 {
   public:
-    void* sig_function;
+    boost::signals2::signal<void(VariantList*)> sig_function;
 };
 
 class VariantDB
@@ -24,8 +24,6 @@ class VariantDB
 
   private:
     std::unordered_map<std::string, std::shared_ptr<Variant>> m_data;
-    uint8_t pad[16];
     std::unordered_map<std::string, std::shared_ptr<FunctionObject>> m_functionData;
-    uint8_t pad2[16];
     std::unordered_map<std::string, std::shared_ptr<Variant>>::iterator m_nextItor;
 };

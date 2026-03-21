@@ -1,26 +1,30 @@
 #pragma once
+#include "variantdb.hpp"
 #include <list>
 #include <string>
-#include "variantdb.hpp"
 
-#include "utils/utils.hpp"
+
 #include "game/struct/component.hpp"
+#include "utils/utils.hpp"
 
-class Entity
+
+#include "boost/signals2/trackable.hpp"
+
+class Entity : public boost::signals2::trackable
 {
   public:
     Entity() { OneTimeInit(); }
     Entity(std::string name)
     {
-        m_name = name;
+        m_name = name.c_str();
         OneTimeInit();
     }
     virtual ~Entity()
     {
-        //sig_onRemoved(this);
+        // sig_onRemoved(this);
 
         RemoveAllEntities();
-        //RemoveAllComponents();
+        // RemoveAllComponents();
     }
 
     void SetName(std::string name) { m_name = name; }
@@ -49,7 +53,7 @@ class Entity
         m_bTaggedForDeletion = false;
         m_pParent = NULL;
 
-        //GetFunction("OnDelete")->sig_function.connect(1, boost::bind(&Entity::OnDelete, this, _1));
+        // GetFunction("OnDelete")->sig_function.connect(1, boost::bind(&Entity::OnDelete, this, _1));
     }
 
     void OnDelete(VariantList* pVList)
@@ -77,13 +81,17 @@ class Entity
     }
     Entity* GetEntityByNameRecursively(std::string key)
     {
-        if (m_name == key) return this;
-        for (const auto& ent : m_children) {
+        if (m_name == key)
+            return this;
+        for (const auto& ent : m_children)
+        {
             if (ent->m_name == key)
                 return ent;
-            else {
+            else
+            {
                 Entity* pRes = ent->GetEntityByNameRecursively(key);
-                if (pRes) return pRes;
+                if (pRes)
+                    return pRes;
             }
         }
         return nullptr;
@@ -164,11 +172,8 @@ class Entity
     }*/
     EntityComponent* GetComponentByName(std::string key)
     {
-        LOG_DEBUG("GETCOMPBYNAME");
         for (const auto& comp : m_components)
         {
-            comp->GetShared()->Print();
-            LOG_DEBUG("%p %s", &comp, comp.get()->GetName().c_str());
             if (comp->GetName() == key)
                 return comp.get();
         }
@@ -223,10 +228,7 @@ class Entity
     {
         return m_sharedDB.GetVarWithDefault(varName, var);
     }
-    FunctionObject* GetFunction(const std::string& funcName)
-    {
-        return m_sharedDB.GetFunction(funcName);
-    }
+    FunctionObject* GetFunction(const std::string& funcName) { return m_sharedDB.GetFunction(funcName); }
 
     Entity* GetParent() { return m_pParent; }
     void SetParent(Entity* pEntity) { m_pParent = pEntity; }
@@ -234,7 +236,7 @@ class Entity
     // We do not include Function methods right now.
 
     std::list<Entity*>* GetChildren() { return &m_children; }
-    //std::list<EntityComponent*>* GetComponents() { return &m_components; }
+    // std::list<EntityComponent*>* GetComponents() { return &m_components; }
 
     void RemoveAllEntities()
     {
@@ -299,19 +301,17 @@ class Entity
 #endif
     }
 
-    void* trackable;
-    void* smth_else;
     uint8_t sig[24];
-    //boost::signal<void(Entity*)> sig_onRemoved;
+    // boost::signal<void(Entity*)> sig_onRemoved;
 
   private:
-    UbiString m_name;
+    std::string m_name;
     std::list<Entity*> m_children; // @ + 56
-    uint8_t m_childrenMutex[32];
+    uint8_t m_childrenMutex[40];
     std::list<std::unique_ptr<EntityComponent>> m_components; // @ +112
-    uint8_t m_componentsMutex[32];
+    uint8_t m_componentsMutex[40];
     VariantDB m_sharedDB; // @ +168
-    Entity* m_pParent; // @ + 296
+    Entity* m_pParent;    // @ + 296
     bool m_bTaggedForDeletion;
     int m_recursiveFilterReferences;
     Variant* m_pPosVarCache;

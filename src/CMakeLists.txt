@@ -1,9 +1,12 @@
 set(SOURCES
     main.cpp
     game/game.cpp
+    game/options.cpp
     game/signatures.cpp
     game/struct/variantdb.cpp
+    game/struct/entityutils.cpp
     patch/patch.cpp
+    utils/utils.cpp
 )
 
 set(SOURCES_USER_PATCHES
@@ -12,10 +15,9 @@ set(SOURCES_USER_PATCHES
     patch/user/render.cpp
 )
 
-set (SOURCES_CORE_PATCHES
+set(SOURCES_CORE_PATCHES
     patch/core/about.cpp
 )
-
 add_library(${PROJECT_NAME} SHARED
     ${SOURCES}
     ${SOURCES_CORE_PATCHES}
@@ -52,9 +54,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
 ${log-lib}
 and64inline
+boost_signals2
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     $<$<BOOL:${DEVELOPMENT_BUILD}>:OSGT_QOL_DEVELOPMENT>
-    _GLIBCXX_USE_CXX11_ABI=1
+    _GLIBCXX_USE_CXX11_ABI=0
 )
