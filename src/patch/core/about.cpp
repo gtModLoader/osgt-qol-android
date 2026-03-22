@@ -26,7 +26,7 @@ class AboutMenuAttribution : public patch::BasePatch
 
         // We take over TextBox2 (the first Entity under children) and insert our own
         // attribution logic to it.
-        Entity* pTextBox2 = pScrollChild->GetChildren()->front();
+        Entity* pTextBox2 = pScrollChild->GetChildren()->back();
         EntityComponent* pTextComponent = pTextBox2->GetComponentByName("TextBoxRender");
         if (pTextComponent != nullptr)
         {
