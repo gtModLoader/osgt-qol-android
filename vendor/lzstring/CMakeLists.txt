@@ -1,0 +1,2 @@
+add_library(lzstring INTERFACE)
+target_include_directories(lzstring INTERFACE src)

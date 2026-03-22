@@ -112,8 +112,7 @@ std::string ToLowerCaseString(const std::string& s)
     return d;
 }
 
-std::vector<std::string> StringTokenize(const std::string& theString,
-                                        const std::string& theDelimiter)
+std::vector<std::string> StringTokenize(const std::string& theString, const std::string& theDelimiter)
 {
     std::vector<std::string> theStringVector;
 
@@ -126,19 +125,17 @@ std::vector<std::string> StringTokenize(const std::string& theString,
             end = theString.find(theDelimiter, start);
 
             // If at end, use length=maxLength.  Else use length=end-start.
-            theStringVector.push_back(theString.substr(
-                start, (end == std::string::npos) ? std::string::npos : end - start));
+            theStringVector.push_back(
+                theString.substr(start, (end == std::string::npos) ? std::string::npos : end - start));
 
             // If at end, use start=maxSize.  Else use start=end+delimiter.
-            start = ((end > (std::string::npos - theDelimiter.size())) ? std::string::npos
-                                                                       : end + theDelimiter.size());
+            start = ((end > (std::string::npos - theDelimiter.size())) ? std::string::npos : end + theDelimiter.size());
         }
     }
 
     return theStringVector;
 }
-std::vector<std::wstring> StringTokenize(const std::wstring& theString,
-                                        const std::wstring& theDelimiter)
+std::vector<std::wstring> StringTokenize(const std::wstring& theString, const std::wstring& theDelimiter)
 {
     std::vector<std::wstring> theStringVector;
 
@@ -151,12 +148,36 @@ std::vector<std::wstring> StringTokenize(const std::wstring& theString,
             end = theString.find(theDelimiter, start);
 
             // If at end, use length=maxLength.  Else use length=end-start.
-            theStringVector.push_back(theString.substr(
-                start, (end == std::wstring::npos) ? std::wstring::npos : end - start));
+            theStringVector.push_back(
+                theString.substr(start, (end == std::wstring::npos) ? std::wstring::npos : end - start));
 
             // If at end, use start=maxSize.  Else use start=end+delimiter.
-            start = ((end > (std::wstring::npos - theDelimiter.size())) ? std::wstring::npos
-                                                                       : end + theDelimiter.size());
+            start =
+                ((end > (std::wstring::npos - theDelimiter.size())) ? std::wstring::npos : end + theDelimiter.size());
+        }
+    }
+
+    return theStringVector;
+}
+std::vector<std::u16string> StringTokenize(const std::u16string& theString, const std::u16string& theDelimiter)
+{
+    std::vector<std::u16string> theStringVector;
+
+    if (!theString.empty())
+    {
+        size_t start = 0, end = 0;
+
+        while (end != std::u16string::npos)
+        {
+            end = theString.find(theDelimiter, start);
+
+            // If at end, use length=maxLength.  Else use length=end-start.
+            theStringVector.push_back(
+                theString.substr(start, (end == std::u16string::npos) ? std::u16string::npos : end - start));
+
+            // If at end, use start=maxSize.  Else use start=end+delimiter.
+            start = ((end > (std::u16string::npos - theDelimiter.size())) ? std::u16string::npos
+                                                                          : end + theDelimiter.size());
         }
     }
 
@@ -179,8 +200,7 @@ bool StringFromEndMatches(const std::string& line, const std::string textToMatch
     if (line.size() < textToMatch.size())
         return false;
     int sizeOfTextToMatch = (int)strlen(textToMatch.c_str());
-    if (strncmp(&(line.c_str()[line.size() - sizeOfTextToMatch]), textToMatch.c_str(),
-                sizeOfTextToMatch) == 0)
+    if (strncmp(&(line.c_str()[line.size() - sizeOfTextToMatch]), textToMatch.c_str(), sizeOfTextToMatch) == 0)
         return true;
 
     return false;
@@ -188,11 +208,11 @@ bool StringFromEndMatches(const std::string& line, const std::string textToMatch
 
 std::string GetFileExtension(std::string fileName)
 {
-	size_t index = fileName.find_last_of('.');
-	if (index == std::string::npos)
-	{
-		return "";
-	}
+    size_t index = fileName.find_last_of('.');
+    if (index == std::string::npos)
+    {
+        return "";
+    }
 
-	return fileName.substr(index+1, fileName.length());
+    return fileName.substr(index + 1, fileName.length());
 }

@@ -3,8 +3,11 @@
 #include "game.hpp"
 
 REGISTER_GAME_FUNCTION(GetApp, "_Z6GetAppv", App*);
-REGISTER_GAME_FUNCTION(EntityAddComponent, "_ZN6Entity12AddComponentESt10unique_ptrI15EntityComponentSt14default_deleteIS1_EE", EntityComponent*, Entity*, std::unique_ptr<EntityComponent>);
-REGISTER_GAME_FUNCTION(EntityRemoveComponentByName, "_ZN6Entity21RemoveComponentByNameERKSs", bool, Entity*, std::string const&);
+REGISTER_GAME_FUNCTION(EntityAddComponent,
+                       "_ZN6Entity12AddComponentESt10unique_ptrI15EntityComponentSt14default_deleteIS1_EE",
+                       EntityComponent*, Entity*, std::unique_ptr<EntityComponent>);
+REGISTER_GAME_FUNCTION(EntityRemoveComponentByName, "_ZN6Entity21RemoveComponentByNameERKSs", bool, Entity*,
+                       std::string const&);
 REGISTER_GAME_FUNCTION(VariantDBPrint, "_ZN9VariantDB5PrintEv", void, VariantDB*);
 REGISTER_GAME_FUNCTION(VariantDBGetFunction, "_ZN9VariantDB11GetFunctionERKSs", FunctionObject*, VariantDB*,
                        std::string const& key);
@@ -52,8 +55,10 @@ REGISTER_GAME_FUNCTION(SurfaceAnimBlitScaledAnim,
 REGISTER_GAME_FUNCTION(DrawFilledRect, "_Z14DrawFilledRectRK8CL_Rectfjf7CL_Vec2IfE", void, CL_Rectf const&, uint32_t,
                        float, CL_Vec2f*);
 REGISTER_GAME_FUNCTION(SendPacket, "_Z10SendPacket15eNetMessageTypeRKSsP9_ENetPeer", void, int, std::string, void*);
-REGISTER_GAME_FUNCTION(AppGetCachedFileName, "_ZN3App17GetCachedFileNameESs", std::string*, App*, std::string*,
-                       std::string*);
+REGISTER_GAME_FUNCTION(GetSavePath, "_Z11GetSavePathv", std::string);
+REGISTER_GAME_FUNCTION(RenderBatcherFlush, "_ZN13RenderBatcher5FlushENS_10eFlushModeEm", void, void*, unsigned int,
+                       int64_t);
+REGISTER_GAME_GLOBAL_VAR(g_globalBatcher, "g_globalBatcher", void*);
 
 #define RESOLVE_DIR_SYMBOL(name) real::name = (name##_t)dlsym(handle, pattern::name.c_str());
 namespace game
@@ -96,6 +101,9 @@ void GameHarness::resolveSharedSigs()
 
     RESOLVE_DIR_SYMBOL(DrawFilledRect);
     RESOLVE_DIR_SYMBOL(SendPacket);
-    RESOLVE_DIR_SYMBOL(AppGetCachedFileName);
+    RESOLVE_DIR_SYMBOL(GetSavePath);
+
+    RESOLVE_DIR_SYMBOL(RenderBatcherFlush);
+    real::g_globalBatcher = (void*)dlsym(handle, pattern::g_globalBatcher.c_str());
 }
 } // namespace game

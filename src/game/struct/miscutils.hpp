@@ -17,6 +17,7 @@ std::string ToLowerCaseString(const std::string& s);
 
 std::vector<std::string> StringTokenize(const std::string& theString, const std::string& theDelimiter);
 std::vector<std::wstring> StringTokenize(const std::wstring& theString, const std::wstring& theDelimiter);
+std::vector<std::u16string> StringTokenize(const std::u16string& theString, const std::u16string& theDelimiter);
 bool StringFromStartMatches(const std::string& line, const std::string textToMatch);
 bool StringFromEndMatches(const std::string& line, const std::string textToMatch);
 

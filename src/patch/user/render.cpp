@@ -6,6 +6,7 @@
 #include "game/struct/entity.hpp"
 #include "game/struct/graphics/background_blood.hpp"
 #include "game/struct/graphics/background_default.hpp"
+#include "game/struct/miscutils.hpp"
 #include "game/struct/renderutils.hpp"
 #include "game/struct/rtrect.hpp"
 #include "game/struct/world/world.hpp"
@@ -13,6 +14,11 @@
 
 #include "patch/patch.hpp"
 #include "version.h"
+
+#include <fstream>
+#include <iostream>
+
+#include <lz-string.hpp>
 
 REGISTER_GAME_FUNCTION(MainMenuCreate, "_Z14MainMenuCreateP6Entityb", void, Entity*, bool);
 
@@ -49,6 +55,22 @@ REGISTER_GAME_FUNCTION(PlayerItemsRemoveFromQuickSlots, "_ZN11PlayerItems20Remov
                        int);
 REGISTER_GAME_FUNCTION(PlayerItemsFillBlankQuickToolSlotsWithStuff,
                        "_ZN11PlayerItems32FillBlankQuickToolSlotsWithStuffEv", void, PlayerItems*);
+REGISTER_GAME_FUNCTION(WorldRendererDrawBackgroundTiles,
+                       "_ZN13WorldRenderer19DrawBackgroundTilesERSt6vectorIP4TileSaIS2_EE", void, WorldRenderer*,
+                       std::vector<Tile*>*);
+REGISTER_GAME_FUNCTION(WorldRendererDrawWater, "_ZN13WorldRenderer9DrawWaterERSt6vectorIP4TileSaIS2_EE", void,
+                       WorldRenderer*, std::vector<Tile*>*);
+REGISTER_GAME_FUNCTION(WorldTileMapGetTileSafe, "_ZN12WorldTileMap11GetTileSafeEii", Tile*, WorldTileMap*, int, int);
+REGISTER_GAME_FUNCTION(WorldTileMapChooseVisual, "_ZN12WorldTileMap12ChooseVisualEP4Tile", void, WorldTileMap*, Tile*);
+REGISTER_GAME_FUNCTION(WorldTileMapChooseVisual_Flag, "_ZN12WorldTileMap17ChooseVisual_FlagEiii", int, WorldTileMap*,
+                       int, int, int);
+REGISTER_GAME_FUNCTION(WorldTileMapChooseVisual_SmartEdge,
+                       "_ZN12WorldTileMap22ChooseVisual_SmartEdgeEP4Tile17eChooseVisualType", int, WorldTileMap*, Tile*,
+                       int);
+REGISTER_GAME_FUNCTION(DrawTile, "_ZN13WorldRenderer8DrawTileEti7CL_Vec2IfEjP4Tilebb", void, WorldRenderer* param_1,
+                       unsigned short param_2, int param_3, CL_Vec2f* param_4, unsigned int param_5, Tile* param_6,
+                       uint8_t param_7, char param_8);
+REGISTER_GAME_GLOBAL_VAR(g_fireBatcher, "g_fireBatcher", void*);
 static std::vector<std::string> displayNames;
 static uint32_t vanillaWeatherBound = 16;
 class CustomizedTitleScreen : public patch::BasePatch
@@ -1076,3 +1098,949 @@ short HotbarExpanded::m_extendedSlots[6] = {0, 0, 0, 0, 0, 0};
 short HotbarExpanded::m_extraSlots = 0;
 std::vector<std::string> HotbarExpanded::m_optionNames;
 REGISTER_USER_GAME_PATCH(HotbarExpanded, hotbar_expanded);
+
+static int gmsfNoteIDs[34] = {0,    420,  422,  424,  414,   416,   418,   426,   412,   4634, 4636, 4638,
+                              4640, 4642, 4192, 5726, 5728,  5730,  5370,  6030,  6032,  6034, 6808, 6810,
+                              6812, 7218, 7220, 7222, 10528, 10530, 10532, 10828, 10830, 10832};
+static std::vector<std::string> g_overlayAggressivenessNames = {"Least obtrusive", "Overlay paint/spatula icons",
+                                                                "Overlay icons & what to break",
+                                                                "Overlay icons & mismatched tiles"};
+class Buildomatica : public patch::BasePatch
+{
+    void apply() const override
+    {
+        // Buildomatica is a building schematic overlay mod for Growtopia heavily inspired by the
+        // Minecraft mods Schematica and Litematica.
+        // To use - create a "schematics" folder and paste your .gtworld, .dat and/or .GMSF worlds
+        // in it. Next time you enter a world, the schematic will be overlayed.
+
+        // FIXME:
+        // - Steam Pistons, Revolvers, etc having missing components on holograms
+
+        // Nice-to-have/not a priority:
+        // - Look into possibility of using shaders in bgfx to highlight the "hologram" blocks.
+
+        auto& game = game::GameHarness::get();
+        // Hooks
+        game.hookFunctionPattern<WorldRendererDrawBackgroundTiles_t>(pattern::WorldRendererDrawBackgroundTiles,
+                                                                     WorldRendererDrawBackgroundTiles,
+                                                                     &real::WorldRendererDrawBackgroundTiles);
+        game.hookFunctionPattern<WorldRendererDrawWater_t>(pattern::WorldRendererDrawWater, WorldRendererDrawWater,
+                                                           &real::WorldRendererDrawWater);
+        game.hookFunctionPattern<WorldTileMapChooseVisual_SmartEdge_t>(pattern::WorldTileMapChooseVisual_SmartEdge,
+                                                                       WorldTileMapChooseVisual_SmartEdge,
+                                                                       &real::WorldTileMapChooseVisual_SmartEdge);
+        game.hookFunctionPattern<WorldTileMapGetTileSafe_t>(pattern::WorldTileMapGetTileSafe, WorldTileMapGetTileSafe,
+                                                            &real::WorldTileMapGetTileSafe);
+        RESOLVE_SYMBOL(WorldTileMapChooseVisual);
+        RESOLVE_SYMBOL(WorldTileMapChooseVisual_Flag);
+        RESOLVE_SYMBOL(DrawTile);
+        real::g_fireBatcher = (void*)dlsym(game.getGameHandle(), pattern::g_fireBatcher.c_str());
+
+        // We will reset our fake tilemap on map load
+        auto& events = game::EventsAPI::get();
+        events.m_sig_onMapLoaded.connect(&OnMapLoaded);
+        events.m_sig_loadFromMem.connect(&loadFromMemCallback);
+
+        // We'll want to overlay ontop of everything if there's anything amiss.
+        events.m_sig_worldRendererOnRender.connect(&WorldRendererOnRender);
+
+        auto& optionsMgr = game::OptionsManager::get();
+        optionsMgr.addCheckboxOption("qol", "Buildomatica", "osgt_qol_buildomatica_toggle",
+                                     "Render schematic if one exists for this world", &OnBuildomaticaToggle);
+        optionsMgr.addMultiChoiceOption("qol", "Buildomatica", "osgt_qol_buildomatica_overlay_obtrusiveness",
+                                        "Overlay Obtrusiveness", g_overlayAggressivenessNames,
+                                        &OnBuildomaticaOverlayObtrusivity, 80.0f);
+    }
+
+    static void loadFromMemCallback()
+    {
+        LOG_DEBUG("sup");
+        Variant* pVariant = real::GetApp()->GetVar("osgt_qol_buildomatica_toggle");
+        if (pVariant->GetType() == Variant::TYPE_UNUSED)
+            pVariant->Set(1U);
+        m_bModEnabled = pVariant->GetUINT32();
+
+        pVariant = real::GetApp()->GetVar("osgt_qol_buildomatica_overlay_obtrusiveness");
+        if (pVariant->GetType() == Variant::TYPE_UNUSED)
+            pVariant->Set(1U); // Good middle-ground, overlay paint/flip ontop.
+        m_overlayObtrusiveness = pVariant->GetUINT32();
+    }
+
+    // Options
+    static void OnBuildomaticaToggle(VariantList* pVariant)
+    {
+        Entity* pCheckbox = pVariant->Get(1).GetEntity();
+        m_bModEnabled = pCheckbox->GetVar("checked")->GetUINT32() != 0;
+        real::GetApp()->GetVar("osgt_qol_buildomatica_toggle")->Set(uint32_t(m_bModEnabled));
+
+        if (m_bModEnabled && real::GetApp()->GetGameLogic()->m_pWorld != nullptr)
+            OnMapLoaded(real::GetApp()->GetGameLogic()->m_pWorldRenderer, 0, 0, 0);
+        else
+        {
+            if (m_fakeTilemap.m_tiles.size() != 0)
+                real::LogToConsole("`![Buildomatica]`` Unloaded schematic.");
+            m_fakeTilemap.m_tiles.clear();
+            m_cameraTiles.clear();
+        }
+    }
+
+    static void OnBuildomaticaOverlayObtrusivity(VariantList* pVariant)
+    {
+        Entity* pClickedEnt = pVariant->Get(1).GetEntity();
+        Variant* pOptVar = real::GetApp()->GetVar("osgt_qol_buildomatica_overlay_obtrusiveness");
+        uint32_t idx = pOptVar->GetUINT32();
+        if (pClickedEnt->GetName() == "back")
+        {
+            if (idx == 0)
+                idx = (uint32_t)g_overlayAggressivenessNames.size() - 1;
+            else
+                idx--;
+        }
+        else if (pClickedEnt->GetName() == "next")
+        {
+            if (idx >= g_overlayAggressivenessNames.size() - 1)
+                idx = 0;
+            else
+                idx++;
+        }
+        pOptVar->Set(idx);
+        m_overlayObtrusiveness = idx;
+        // Update the option label
+        Entity* pTextLabel = pClickedEnt->GetParent()->GetEntityByName("txt");
+        real::SetTextEntity(pTextLabel, g_overlayAggressivenessNames[idx]);
+    }
+
+    // Entry point for initializing the mod
+    static void OnMapLoaded(void* this_, int64_t, int64_t, int64_t)
+    {
+        if (!m_bModEnabled)
+            return;
+        // Reset our fake tilemap details
+        m_fakeTilemap.m_sizeX = ((WorldRenderer*)this_)->m_pWorld->m_tiles.m_sizeX;
+        m_fakeTilemap.m_sizeY = ((WorldRenderer*)this_)->m_pWorld->m_tiles.m_sizeY;
+        m_fakeTilemap.m_pParent = ((WorldRenderer*)this_)->m_pWorld;
+
+        m_fakeTilemap.m_tiles.clear();
+        m_cameraTiles.clear();
+
+        // Load our schematic based on world name.. and also check for any nasty surprises before we
+        // open anything.
+        std::string& m_name = ((WorldRenderer*)this_)->m_pWorld->m_name;
+        if (m_name.find("..") == std::string::npos && m_name.find("/") == std::string::npos &&
+            m_name.find("%") == std::string::npos)
+        {
+            // Prioritize GPMAP, if it exists.
+            int StatusCode = LoadFromGPMAP("schematics/" + m_name + ".dat");
+            if (StatusCode != 0)
+            {
+                if (StatusCode != 1)
+                {
+                    real::LogToConsole(std::string("`![Buildomatica]`` Failed to load schematic - error code: 0-" +
+                                                   toString(StatusCode))
+                                           .c_str());
+                    return;
+                }
+                StatusCode = LoadFromCernPlannerFile("schematics/" + m_name + ".gtworld");
+                if (StatusCode > 2)
+                    real::LogToConsole(std::string("`![Buildomatica]`` Failed to load schematic - error code: 1-" +
+                                                   toString(StatusCode))
+                                           .c_str());
+            }
+            if (StatusCode == 0)
+                real::LogToConsole("`![Buildomatica]`` Loaded in schematic overlay.");
+
+            int MusicStatusCode = LoadFromGMSF("schematics/" + m_name + ".GMSF");
+            if (MusicStatusCode == 0)
+                real::LogToConsole("`![Buildomatica]`` Loaded in schematic overlay for music.");
+            else if (MusicStatusCode != 1)
+                real::LogToConsole(std::string("`![Buildomatica]`` Failed to load music schematic - error code: " +
+                                               toString(MusicStatusCode))
+                                       .c_str());
+
+            if (StatusCode != 0 && MusicStatusCode != 0)
+                return;
+            m_bDrawNotesOnly = StatusCode != 0 && MusicStatusCode == 0;
+        }
+
+        RebuildIndexes(&m_fakeTilemap);
+        for (auto& t : m_fakeTilemap.m_tiles)
+            real::WorldTileMapChooseVisual(&m_fakeTilemap, &t);
+        CullTilemap(&m_fakeTilemap);
+    }
+
+    // Helpers
+    static void RebuildIndexes(WorldTileMap* pTilemap)
+    {
+        // Replicate what client does with actual tilemap, it sets a rect for culling purposes and
+        // indexes tiles by their order.
+        for (int x = 0; x < pTilemap->m_sizeX; x++)
+        {
+            for (int y = 0; y < pTilemap->m_sizeY; y++)
+            {
+                int m_index = x + (y * pTilemap->m_sizeX);
+                Tile& t = pTilemap->m_tiles[m_index];
+                t.x = x;
+                t.y = y;
+                t.m_worldRect.left = t.x * 32.0f;
+                t.m_worldRect.right = t.m_worldRect.left + 32.0f;
+                t.m_worldRect.top = t.y * 32.0f;
+                t.m_worldRect.bottom = t.m_worldRect.top + 32.0f;
+                t.m_mapIndex = m_index;
+            }
+        }
+    }
+
+    static void CullTilemap(WorldTileMap* pTilemap)
+    {
+        m_cameraTiles.clear();
+        WorldRenderer* pRender = (WorldRenderer*)real::GetApp()->GetGameLogic()->m_pWorldRenderer;
+        Rectf m_viewableRect = {
+            pRender->m_camera.m_vCamWorldPosUpperLeft.x - 32.f, pRender->m_camera.m_vCamWorldPosUpperLeft.y - 32.f,
+            pRender->m_camera.m_vWorldSizeViewableInScreen.x + pRender->m_camera.m_vCamWorldPosUpperLeft.x + 32.f,
+            pRender->m_camera.m_vWorldSizeViewableInScreen.y + pRender->m_camera.m_vCamWorldPosUpperLeft.y + 32.f};
+
+        // This will reserve either the exact amount or slightly higher amount for vec.
+        int x = (int)((m_viewableRect.right - m_viewableRect.left) / 32.0f);
+        int y = (int)((m_viewableRect.bottom - m_viewableRect.top) / 32.0f);
+        m_cameraTiles.reserve(x * y);
+        for (auto& t : m_fakeTilemap.m_tiles)
+        {
+            if (t.m_worldRect.left >= m_viewableRect.left && t.m_worldRect.right <= m_viewableRect.right &&
+                t.m_worldRect.top >= m_viewableRect.top && t.m_worldRect.bottom <= m_viewableRect.bottom)
+                m_cameraTiles.push_back(&t);
+        }
+    }
+
+    static int CalculatePaintColor(Tile* t)
+    {
+        int Flags = t->m_flags & TILE_PROPERTY_PAINT_BLACK;
+        int r = 0xff;
+        int g = 0xff;
+        int b = 0xff;
+        if (Flags == TILE_PROPERTY_PAINT_BLACK)
+        {
+            // Do not mux this one and also use slightly higher opacity for visibility.
+            return 0x3C3C3CCC;
+        }
+        if (Flags == TILE_PROPERTY_PAINT_AQUA)
+            r = 0x3C;
+        else if (Flags == TILE_PROPERTY_PAINT_PURPLE)
+            g = 0x3C;
+        else if (Flags == TILE_PROPERTY_PAINT_YELLOW)
+            b = 0x3C;
+        else if (Flags == TILE_PROPERTY_PAINT_BLUE)
+        {
+            g = 0x3C;
+            r = 0x3C;
+        }
+        else if (Flags == TILE_PROPERTY_PAINT_GREEN)
+        {
+            r = 0x3C;
+            b = 0x3C;
+        }
+        else if (Flags == TILE_PROPERTY_PAINT_RED)
+        {
+            g = 0x3C;
+            b = 0x3C;
+        }
+        return ColorCombine(0xff + (r << 8) + (g << 16) + (b << 24), 0xe8ffb0aa, 0.66f);
+    }
+
+    static int GetMuxedColorForTile(WorldRenderer* pRenderer, Tile* pTile, bool bFG)
+    {
+        ItemInfo* pItemInfo =
+            real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(bFG ? pTile->m_itemID : pTile->m_itemBGID);
+        bool bPainted = pTile->currentColor != 0xe8ffb0aa;
+        if (pItemInfo->m_visualEffect == 25)
+        {
+            // VISUAL_EFFECT_RAINBOW_SHIFT
+            // (Shifty Blocks)
+            int r, g, b = 0;
+            float Hue = (float)(pTile->x + (pTile->x * 4) + pRenderer->m_rainbowCycle + (pTile->y << 3));
+            while (360.f <= Hue)
+                Hue -= 360.f;
+            HSVToRGB(Hue, 1.0, 1.0, &r, &g, &b);
+            return ColorCombine(0xff + (r << 8) + (g << 16) + (b << 24), 0xe8ffb0aa, 0.66f);
+        }
+        else if (pItemInfo->m_visualEffect == 36 && !bPainted)
+        {
+            // VISUAL_EFFECT_DISCOLOR
+            // (Copper Plumbing)
+            if (!(pItemInfo->m_itemID & 1))
+                pItemInfo = real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(pItemInfo->m_itemID + 1);
+            return ColorCombine(pItemInfo->m_growInfo.m_overlayColor, 0xe8ffb0aa, 0.66f);
+        }
+        return pTile->currentColor;
+    }
+
+    // Hacks to make client prefer our tilemap inside DrawTile.
+    static int WorldTileMapChooseVisual_SmartEdge(WorldTileMap* pTilemap, Tile* p2, int p3)
+    {
+        // Used for steam block borders
+        return real::WorldTileMapChooseVisual_SmartEdge(m_bDrawingHologram ? &m_fakeTilemap : pTilemap, p2, p3);
+    }
+
+    static Tile* WorldTileMapGetTileSafe(WorldTileMap* pTilemap, int x, int y)
+    {
+        // Used in various places in DrawTile and WorldRenderer/Tilemap subfunctions such as
+        // PickVisualOnTheFly which determines spike locations.
+        return real::WorldTileMapGetTileSafe(m_bDrawingHologram ? &m_fakeTilemap : pTilemap, x, y);
+    }
+
+    static void WorldRendererDrawBackgroundTiles(WorldRenderer* this_, std::vector<Tile*>* tiles)
+    {
+        if (m_bModEnabled || m_bDrawNotesOnly)
+            CullTilemap(&m_fakeTilemap);
+        if (m_bModEnabled)
+        {
+            // Draw our background "hologram" from fake tilemap after world background has been drawn.
+            CL_Vec2f camera;
+            WorldTileMap& m_origTilemap = this_->m_pWorld->m_tiles;
+            for (auto& t : m_cameraTiles)
+            {
+                if (t->x >= m_origTilemap.m_sizeX || t->y >= m_origTilemap.m_sizeY)
+                    continue;
+                if (t->m_itemBGID == 0)
+                    continue;
+                Tile* m_pRef = &m_origTilemap.m_tiles[t->x + (t->y * m_origTilemap.m_sizeX)];
+                if (m_pRef->m_itemID != 0 || m_pRef->m_itemBGID != 0)
+                    continue;
+                CL_Vec2f tilePos(t->x * 32.f, t->y * 32.f);
+                this_->m_camera.WorldToScreen(&camera, tilePos);
+                if (t->m_itemBGID != 0)
+                    real::DrawTile(this_, t->m_itemBGID, t->m_visualBG, &camera, GetMuxedColorForTile(this_, t, false),
+                                   t, 1, 0);
+            }
+        }
+        real::WorldRendererDrawBackgroundTiles(this_, tiles);
+        if (!m_bModEnabled || m_bDrawNotesOnly)
+            return;
+        // Draw our foreground "hologram" from fake tilemap after world bgs has been drawn.
+        CL_Vec2f camera;
+        WorldTileMap& m_origTilemap = this_->m_pWorld->m_tiles;
+        m_bDrawingHologram = true;
+        for (auto& t : m_cameraTiles)
+        {
+            if (t->x >= m_origTilemap.m_sizeX || t->y >= m_origTilemap.m_sizeY)
+                continue;
+            if (t->m_itemID == 0)
+                continue;
+            Tile* m_pRef = &m_origTilemap.m_tiles[t->x + (t->y * m_origTilemap.m_sizeX)];
+            if ((m_pRef->m_itemBGID != 0 && t->m_itemID == 0) || t->m_itemID == m_pRef->m_itemID)
+                continue;
+            CL_Vec2f tilePos(t->x * 32.f, t->y * 32.f);
+            this_->m_camera.WorldToScreen(&camera, tilePos);
+            // Ignore seeds if they are somehow present in our data. Neither planner format supports
+            // it, but converter tools may leave residue.
+            if (t->m_itemID != 0 && !(t->m_itemID & 1))
+            {
+                ItemInfo* pInfo = real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(t->m_itemID);
+                if (pInfo->m_flags & 0x40)
+                {
+                    // Hack in workaround for NOSHADOW. Game expects alpha 0xFF, but that kinda
+                    // ruins the overlay. One could nop out DrawTile+0x368 to avoid doing this, but
+                    // it has unknown consequences.
+                    pInfo->m_flags &= ~0x40;
+                    real::DrawTile(this_, t->m_itemID, t->m_visual, &camera, GetMuxedColorForTile(this_, t, true), t, 0,
+                                   0);
+                    pInfo->m_flags |= 0x40;
+                }
+                else
+                {
+                    real::DrawTile(this_, t->m_itemID, t->m_visual, &camera, GetMuxedColorForTile(this_, t, true), t, 0,
+                                   0);
+                }
+            }
+        }
+        m_bDrawingHologram = false;
+    }
+
+    static void WorldRendererDrawWater(WorldRenderer* this_, std::vector<Tile*>* tiles)
+    {
+        real::WorldRendererDrawWater(this_, tiles);
+        if (!m_bModEnabled || m_bDrawNotesOnly)
+            return;
+        // Draw our water "hologram" from fake tilemap after rest of world has been drawn.
+        // TODO: Fire skewing/animation
+        CL_Vec2f camera;
+        CL_Vec2f rotation(0, 0);
+        WorldTileMap& m_origTilemap = this_->m_pWorld->m_tiles;
+        for (auto& t : m_cameraTiles)
+        {
+            if (t->x >= m_origTilemap.m_sizeX || t->y >= m_origTilemap.m_sizeY)
+                continue;
+            Tile* m_pRef = &m_origTilemap.m_tiles[t->x + (t->y * m_origTilemap.m_sizeX)];
+            if ((t->m_flags & TILE_PROPERTY_WATER) == (m_pRef->m_flags & TILE_PROPERTY_WATER) &&
+                (t->m_flags & TILE_PROPERTY_FIRE) == (m_pRef->m_flags & TILE_PROPERTY_FIRE))
+                continue;
+            CL_Vec2f tilePos(t->x * 32.f, t->y * 32.f);
+            tilePos = *this_->m_camera.WorldToScreen(&camera, tilePos);
+            if (t->m_flags & TILE_PROPERTY_WATER)
+            {
+                int visual = real::WorldTileMapChooseVisual_Flag(&m_fakeTilemap, t->x, t->y, 0x400);
+                this_->m_waterImg->BlitScaledAnim(tilePos.x, tilePos.y, visual % 8, visual >> 3,
+                                                  &this_->m_camera.m_vScale, 0, 0xE8FFB050, 0, rotation, false, false,
+                                                  real::g_globalBatcher);
+            }
+            else if (m_pRef->m_flags & TILE_PROPERTY_WATER)
+            {
+                // Tint it purplish red by using green water as base surface and tinting it red.
+                int visual = real::WorldTileMapChooseVisual_Flag(&this_->m_pWorld->m_tiles, t->x, t->y, 0x400);
+                this_->m_greenWaterImg->BlitScaledAnim(tilePos.x, tilePos.y, visual % 8, visual >> 3,
+                                                       &this_->m_camera.m_vScale, 0, 0xFF90, 0, rotation, false, false,
+                                                       real::g_globalBatcher);
+            }
+            else if (t->m_flags & TILE_PROPERTY_FIRE)
+            {
+                int visual = real::WorldTileMapChooseVisual_Flag(&m_fakeTilemap, t->x, t->y, 0x1000);
+                this_->m_fireImg->BlitScaledAnim(tilePos.x, tilePos.y, visual % 8, visual >> 3,
+                                                 &this_->m_camera.m_vScale, 0, 0xE8FFB0A0, 0, rotation, false, false,
+                                                 real::g_fireBatcher);
+            }
+            else if (m_pRef->m_flags & TILE_PROPERTY_FIRE)
+            {
+                int visual = real::WorldTileMapChooseVisual_Flag(&this_->m_pWorld->m_tiles, t->x, t->y, 0x1000);
+                this_->m_fireImg->BlitScaledAnim(tilePos.x, tilePos.y, visual % 8, visual >> 3,
+                                                 &this_->m_camera.m_vScale, 0, 0xFFA0, 0, rotation, false, false,
+                                                 real::g_fireBatcher);
+            }
+        }
+        real::RenderBatcherFlush(real::g_globalBatcher, 0, -1);
+        real::RenderBatcherFlush(real::g_fireBatcher, 0, -1);
+    }
+
+    static void WorldRendererOnRender(void* this__, CL_Vec2f*)
+    {
+        // TODO: highlight for backgrounds as well on mismatch.
+        WorldRenderer* this_ = (WorldRenderer*)this__;
+        if (!m_bModEnabled)
+            return;
+        if (m_overlayObtrusiveness == 0)
+            return;
+        // Overlay stuff ontop after everythings drawn.
+        CL_Vec2f camera;
+        WorldTileMap& m_origTilemap = this_->m_pWorld->m_tiles;
+        for (auto& t : m_cameraTiles)
+        {
+            if (t->x >= m_origTilemap.m_sizeX || t->y >= m_origTilemap.m_sizeY)
+                continue;
+            Tile* m_pRef = &m_origTilemap.m_tiles[t->x + (t->y * m_origTilemap.m_sizeX)];
+            bool bMatchingItem = m_pRef->m_itemID == t->m_itemID;
+            int overlayIcon = -1;
+            int iconTint = 0xFFFFFFAA;
+            // Blit an icon if some of the properties mismatch.
+            if (bMatchingItem && !m_bDrawNotesOnly)
+            {
+                ItemInfo* pItemInfo = real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(t->m_itemID);
+                if ((pItemInfo->m_flags & 1) &&
+                    (t->m_flags & TILE_PROPERTY_FACING_LEFT) != (m_pRef->m_flags & TILE_PROPERTY_FACING_LEFT))
+                    overlayIcon = 2966; // Enchanted Spatula
+                else if ((t->m_flags & TILE_PROPERTY_GLUE) != (m_pRef->m_flags & TILE_PROPERTY_GLUE))
+                    overlayIcon = 1866; // Block Glue
+                else if ((t->m_flags & TILE_PROPERTY_PAINT_BLACK) != (m_pRef->m_flags & TILE_PROPERTY_PAINT_BLACK))
+                {
+                    // Overlay a paint bucket icon if we're mismatching a paint.
+                    int Flags = t->m_flags & TILE_PROPERTY_PAINT_BLACK;
+                    if (Flags == 0)
+                        overlayIcon = 3492;
+                    else if (Flags == TILE_PROPERTY_PAINT_BLACK)
+                        overlayIcon = 3490;
+                    else if (Flags == TILE_PROPERTY_PAINT_AQUA)
+                        overlayIcon = 3484;
+                    else if (Flags == TILE_PROPERTY_PAINT_PURPLE)
+                        overlayIcon = 3488;
+                    else if (Flags == TILE_PROPERTY_PAINT_YELLOW)
+                        overlayIcon = 3480;
+                    else if (Flags == TILE_PROPERTY_PAINT_BLUE)
+                        overlayIcon = 3486;
+                    else if (Flags == TILE_PROPERTY_PAINT_GREEN)
+                        overlayIcon = 3482;
+                    else if (Flags == TILE_PROPERTY_PAINT_RED)
+                        overlayIcon = 3478;
+                }
+            }
+            bool bMatchingBG = m_pRef->m_itemBGID == t->m_itemBGID;
+            if (m_pRef->m_itemID == 0 && m_pRef->m_itemBGID == 0)
+                continue;
+            CL_Vec2f tilePos(t->x * 32.f, t->y * 32.f);
+            this_->m_camera.WorldToScreen(&camera, tilePos);
+            if (m_overlayObtrusiveness >= 2 && !bMatchingBG && (m_pRef->m_itemBGID != 0 || m_pRef->m_itemID != 0))
+            {
+                // Draw a vaporizer ray if we've placed a matching FG tile, but BG is wrong.
+                if (m_overlayObtrusiveness >= 3 && t->m_itemBGID == 0 && bMatchingItem && m_pRef->m_itemID != 0 &&
+                    !m_bDrawNotesOnly)
+                {
+                    overlayIcon = 3156;
+                    iconTint = 0x3C3CFFAA;
+                }
+                else
+                {
+                    // Draw a ghost of intended background if wrong one is used and we're on the
+                    // intended fg. Or highlight existing if you're supposed to get rid of it.
+                    if (t->m_itemBGID != 0 && (bMatchingItem || m_pRef->m_itemID == 0))
+                    {
+                        // We want this to draw at vislevel 2 if there's no foreground tiles placed.
+                        if (m_overlayObtrusiveness >= 3 || m_pRef->m_itemID == 0)
+                        {
+                            int col = 0xFF80;
+                            // If we just missed one, make it a more neutral yellow tone, less
+                            // confusing.
+                            if (m_pRef->m_itemBGID == 0)
+                                col = 0xFFFF80;
+                            real::DrawTile(this_, t->m_itemBGID, t->m_visualBG, &camera, col, t, 1, 0);
+                        }
+                    }
+                    else if (t->m_itemBGID == 0 && m_pRef->m_itemID == 0 && !m_bDrawNotesOnly)
+                        real::DrawTile(this_, m_pRef->m_itemBGID, m_pRef->m_visualBG, &camera, 0xFF80, m_pRef, 1, 0);
+                }
+            }
+            if (m_overlayObtrusiveness >= 2 && !bMatchingItem && m_pRef->m_itemID != 0 && !(m_pRef->m_itemID & 1))
+            {
+                // Draw a red overlay on tiles we need to break and overlay intended tile ontop if
+                // there is one.
+                if (!m_bDrawNotesOnly || (m_bDrawNotesOnly && t->m_itemBGID != 0))
+                {
+                    real::DrawTile(this_, m_pRef->m_itemID, m_pRef->m_visual, &camera, 0xFF40, m_pRef, 0, 0);
+                    if (t->m_itemID != 0)
+                    {
+                        m_bDrawingHologram = true;
+                        ItemInfo* pInfo = real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(t->m_itemID);
+                        if (pInfo->m_flags & 0x40)
+                        {
+                            // Hack in workaround for NOSHADOW here as well.
+                            pInfo->m_flags &= ~0x40;
+                            real::DrawTile(this_, t->m_itemID, t->m_visual, &camera, 0xFF80, t, 0, 0);
+                            pInfo->m_flags |= 0x40;
+                        }
+                        else
+                        {
+                            real::DrawTile(this_, t->m_itemID, t->m_visual, &camera, 0xFF80, t, 0, 0);
+                        }
+                        m_bDrawingHologram = false;
+                    }
+                }
+            }
+            if (m_overlayObtrusiveness >= 1 && overlayIcon != -1)
+            {
+                // If we have any icon to draw, we'll need to masquerade tile's tilevisual and item
+                // ID, otherwise it'll render garbage.
+                int origItem = t->m_itemID;
+                int origVis = t->m_visual;
+
+                t->m_itemID = overlayIcon;
+                t->m_visual = 0;
+                real::DrawTile(this_, t->m_itemID, t->m_visual, &camera, iconTint, t, 0, 0);
+                t->m_itemID = origItem;
+                t->m_visual = origVis;
+            }
+        }
+    }
+
+    static int u16toi(const std::u16string& s)
+    {
+        std::string narrow(s.begin(), s.end());
+        return std::atoi(narrow.c_str());
+    }
+
+    // World planner conversions
+    static int LoadFromGPMAP(std::string Path)
+    {
+        std::ifstream world(real::GetSavePath() + Path);
+        if (!world)
+            return 1;
+        // Load the file in as a wstring, we need to decompress it using lzstring library and it
+        // requires a wstring.
+        std::u16string m_saveData{std::istreambuf_iterator<char>(world), std::istreambuf_iterator<char>()};
+        world.close();
+
+        m_saveData = lzstring::decompressFromBase64(m_saveData);
+
+        // Not a valid GPMAP2 file.
+        size_t headerpos = m_saveData.find(u"GPMAP2");
+        if (headerpos == std::wstring::npos)
+            return 2;
+
+        // Get position of the '|' delimiter after Width/Height/Weather data.
+        size_t delim = m_saveData.find(u"|", headerpos + 7);
+        if (delim == std::wstring::npos)
+            return 3;
+
+        std::u16string header = m_saveData.substr(7, delim);
+        std::vector<std::u16string> tokens = StringTokenize(header, u",");
+
+        // We need at least width/height available. Don't really care about weather.
+        if (tokens.size() < 2)
+            return 4;
+
+        int Width = u16toi(tokens[0]);
+        int Height = u16toi(tokens[1]);
+
+        // Reject loading if sizes do not match.
+        if (Width != m_fakeTilemap.m_sizeX || Height != m_fakeTilemap.m_sizeY)
+            return 5;
+
+        // Fill in the tilemap and set the tile tint in place.
+        m_fakeTilemap.m_tiles.clear();
+        m_fakeTilemap.m_tiles.reserve(m_fakeTilemap.m_sizeY * m_fakeTilemap.m_sizeX);
+        for (int y = 0; y < m_fakeTilemap.m_sizeY; y++)
+        {
+            for (int x = 0; x < m_fakeTilemap.m_sizeX; x++)
+            {
+                m_fakeTilemap.m_tiles.push_back(Tile());
+                // RGB #b0e8ff
+                m_fakeTilemap.m_tiles.back().currentColor = 0xe8ffb0aa;
+            }
+        }
+
+        // Parse the chunks. GPMAP2 works not too differently from .gtworld, it's just using Item
+        // IDs rather than names and sections layers off the same way.
+        size_t ChunkSize = Width * Height * 4;
+
+        // Narrow down UTF-16 to UTF-8. codecvt doesn't help here, loses too much info.
+        std::u16string data = m_saveData.substr(delim + 1, ChunkSize * 4);
+        if (data.size() != ChunkSize * 4)
+            return 6;
+        uint8_t* pMem = new uint8_t[ChunkSize * 4];
+        size_t ptr = 0;
+        for (wchar_t c : data)
+            pMem[ptr++] = (char)c;
+
+        // "fg" layer
+        ptr = 0;
+        for (int i = 0; i < (Width * Height); i++)
+        {
+            int itemID = *((int*)(pMem + ptr));
+            ItemInfo* pItem = real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(itemID);
+            if (pItem->m_itemID != 0 && !(pItem->m_itemID & 1))
+            {
+                m_fakeTilemap.m_tiles[i].m_itemID = itemID;
+                m_fakeTilemap.m_tiles[i].m_collisionType = pItem->m_collisionType;
+                m_fakeTilemap.m_tiles[i].m_collidable = pItem->m_collisionType != 0 && pItem->m_collisionType != 5;
+            }
+            ptr += 4;
+        }
+        // "bg" layer
+        for (int i = 0; i < (Width * Height); i++)
+        {
+            int itemID = *((int*)(pMem + ptr));
+            ItemInfo* pItem = real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(itemID);
+            if (pItem->m_itemID != 0)
+                m_fakeTilemap.m_tiles[i].m_itemBGID = itemID;
+            ptr += 4;
+        }
+        // "ex" layer
+        for (int i = 0; i < (Width * Height); i++)
+        {
+            int flags = *((int*)(pMem + ptr));
+            if (flags == 10001)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_WATER;
+            else if (flags == 10002)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_FIRE;
+            ptr += 4;
+        }
+        // "meta"
+        for (int i = 0; i < (Width * Height); i++)
+        {
+            int Flag = *((int*)(pMem + ptr));
+            ptr += 4;
+            if (Flag & GPMAP_PROPERTY_GLUE)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_GLUE;
+            if (Flag & GPMAP_PROPERTY_FLIP)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_FACING_LEFT;
+            if (Flag & GPMAP_PROPERTY_TOGGLED)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_TOGGLED | TILE_PROPERTY_SILENCED;
+            if ((Flag & GPMAP_PROPERTY_PAINT_CHARCOAL) == GPMAP_PROPERTY_PAINT_CHARCOAL)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_BLACK;
+            else if ((Flag & GPMAP_PROPERTY_PAINT_RED) == GPMAP_PROPERTY_PAINT_RED)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_RED;
+            else if ((Flag & GPMAP_PROPERTY_PAINT_GREEN) == GPMAP_PROPERTY_PAINT_GREEN)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_GREEN;
+            else if ((Flag & GPMAP_PROPERTY_PAINT_BLUE) == GPMAP_PROPERTY_PAINT_BLUE)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_BLUE;
+            else if (Flag & GPMAP_PROPERTY_PAINT_YELLOW)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_YELLOW;
+            else if (Flag & GPMAP_PROPERTY_PAINT_PURPLE)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_PURPLE;
+            else if (Flag & GPMAP_PROPERTY_PAINT_AQUA)
+                m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_AQUA;
+            if (m_fakeTilemap.m_tiles[i].m_flags & TILE_PROPERTY_PAINT_BLACK)
+            {
+                if (m_fakeTilemap.m_tiles[i].m_itemID == 0 && m_fakeTilemap.m_tiles[i].m_itemBGID == 0)
+                    m_fakeTilemap.m_tiles[i].m_flags &= ~TILE_PROPERTY_PAINT_BLACK;
+                else
+                    m_fakeTilemap.m_tiles[i].currentColor = CalculatePaintColor(&m_fakeTilemap.m_tiles[i]);
+            }
+        }
+        delete[] pMem;
+        return 0;
+    }
+
+    static int LoadFromCernPlannerFile(std::string Path)
+    {
+        // Cernodile's World Planner format. Kinda horrible, bunch of string parsing.
+        if (m_fakeTilemap.m_sizeY != 60 && m_fakeTilemap.m_sizeX != 100)
+            return 1;
+        std::ifstream world(real::GetSavePath() + Path);
+        if (!world)
+            return 2;
+        std::string m_saveData{std::istreambuf_iterator<char>(world), std::istreambuf_iterator<char>()};
+        world.close();
+        if (m_saveData.substr(0, 18) != "%cernworldplanner;")
+            return 3;
+
+        m_fakeTilemap.m_tiles.clear();
+        m_fakeTilemap.m_tiles.reserve(m_fakeTilemap.m_sizeY * m_fakeTilemap.m_sizeX);
+        for (int y = 0; y < m_fakeTilemap.m_sizeY; y++)
+        {
+            for (int x = 0; x < m_fakeTilemap.m_sizeX; x++)
+            {
+                m_fakeTilemap.m_tiles.push_back(Tile());
+                // RGB #b0e8ff
+                m_fakeTilemap.m_tiles.back().currentColor = 0xe8ffb0aa;
+            }
+        }
+
+        // Cernodile's World Planner packs layers into 4 comma-separated arrays
+        std::vector<std::string> foreground, background;
+        std::vector<int> water, glue;
+        // Sections are walled off by "section=", so we can use them as guiderails for how much to
+        // scan.
+        if (m_saveData.find("fg=") != std::string::npos && m_saveData.find("bg=") != std::string::npos)
+        {
+            std::vector<std::string> m_layers = StringTokenize(
+                m_saveData.substr(m_saveData.find("fg="), m_saveData.find("bg=") - m_saveData.find("fg=")).substr(3),
+                "\n");
+            for (int i = 0; i != m_layers.size(); i++)
+            {
+                std::vector<std::string> tiles = StringTokenize(m_layers[i], ",");
+                for (int j = 0; j < tiles.size(); j++)
+                    foreground.emplace_back(tiles[j]);
+            }
+        }
+        if (m_saveData.find("bg=") != std::string::npos && m_saveData.find("water=") != std::string::npos)
+        {
+            std::vector<std::string> m_layers = StringTokenize(
+                m_saveData.substr(m_saveData.find("bg="), m_saveData.find("water=") - m_saveData.find("bg=")).substr(3),
+                "\n");
+            for (int i = 0; i != m_layers.size(); i++)
+            {
+                std::vector<std::string> tiles = StringTokenize(m_layers[i], ",");
+                for (int j = 0; j < tiles.size(); j++)
+                    background.emplace_back(tiles[j]);
+            }
+        }
+        if (m_saveData.find("water=") != std::string::npos && m_saveData.find("glue=") != std::string::npos)
+        {
+            std::vector<std::string> m_layers = StringTokenize(
+                m_saveData.substr(m_saveData.find("water="), m_saveData.find("glue=") - m_saveData.find("water="))
+                    .substr(6),
+                "\n");
+            for (int i = 0; i != m_layers.size(); i++)
+            {
+                std::vector<std::string> tiles = StringTokenize(m_layers[i], ",");
+                for (int j = 0; j < tiles.size(); j++)
+                    water.emplace_back(tiles[j] == "Water" ? 1 : tiles[j] == "Fire" ? 2 : 0);
+            }
+        }
+        if (m_saveData.find("water=") != std::string::npos && m_saveData.find("glue=") != std::string::npos)
+        {
+            std::vector<std::string> m_layers =
+                StringTokenize(m_saveData.substr(m_saveData.find("glue=")).substr(5), "\n");
+            for (int i = 0; i != m_layers.size(); i++)
+            {
+                std::vector<std::string> tiles = StringTokenize(m_layers[i], ",");
+                for (int j = 0; j < tiles.size(); j++)
+                    glue.emplace_back(tiles[j] == "Block Glue" ? 1 : 0);
+            }
+        }
+
+        // Planner and tilemap sizes don't match, lets not do any OOB writes here, bail out.
+        if (foreground.size() > (m_fakeTilemap.m_sizeX * m_fakeTilemap.m_sizeY))
+            return 4;
+        for (int i = 0; i < foreground.size(); i++)
+        {
+            if (foreground[i].length() == 0)
+                continue;
+            std::vector<std::string> props = StringTokenize(foreground[i], "_");
+            if (props.size() > 1)
+            {
+                if (foreground[i][2] == '_')
+                {
+                    char Paint = foreground[i][1];
+                    switch (Paint)
+                    {
+                    case 'R':
+                        m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_RED;
+                        break;
+                    case 'G':
+                        m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_GREEN;
+                        break;
+                    case 'B':
+                        m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_BLUE;
+                        break;
+                    case 'P':
+                        m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_PURPLE;
+                        break;
+                    case 'Y':
+                        m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_YELLOW;
+                        break;
+                    case 'A':
+                        m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_AQUA;
+                        break;
+                    case 'C':
+                        m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_PAINT_BLACK;
+                        break;
+                    }
+                    m_fakeTilemap.m_tiles[i].currentColor = CalculatePaintColor(&m_fakeTilemap.m_tiles[i]);
+                    foreground[i] = foreground[i].substr(3);
+                }
+                if (StringFromEndMatches(foreground[i], "_FL"))
+                {
+                    m_fakeTilemap.m_tiles[i].m_flags |= TILE_PROPERTY_FACING_LEFT;
+                    foreground[i] = foreground[i].substr(0, foreground[i].length() - 3);
+                }
+            }
+            ItemInfo* info = real::GetApp()->GetItemInfoManager()->GetItemByName(foreground[i]);
+            if (info->m_itemID != 0)
+            {
+                (&m_fakeTilemap.m_tiles[i])->m_itemID = info->m_itemID;
+                (&m_fakeTilemap.m_tiles[i])->m_collisionType = info->m_collisionType;
+                (&m_fakeTilemap.m_tiles[i])->m_collidable = info->m_collisionType != 0 && info->m_collisionType != 5;
+            }
+        }
+        for (int i = 0; i < background.size(); i++)
+        {
+            if (background[i].length() == 0)
+                continue;
+            ItemInfo* info = real::GetApp()->GetItemInfoManager()->GetItemByName(background[i]);
+            if (info->m_itemID != 0)
+                (&m_fakeTilemap.m_tiles[i])->m_itemBGID = info->m_itemID;
+        }
+        for (int i = 0; i < water.size(); i++)
+        {
+            if (water[i] == 1)
+                (&m_fakeTilemap.m_tiles[i])->m_flags |= TILE_PROPERTY_WATER;
+            else if (water[i] == 2)
+                (&m_fakeTilemap.m_tiles[i])->m_flags |= TILE_PROPERTY_FIRE;
+        }
+        for (int i = 0; i < glue.size(); i++)
+        {
+            if (glue[i] != 0)
+                (&m_fakeTilemap.m_tiles[i])->m_flags |= TILE_PROPERTY_GLUE;
+        }
+        return 0;
+    }
+
+    static int LoadFromGMSF(std::string Path)
+    {
+        std::ifstream world(Path, std::ios_base::binary);
+        if (!world)
+            return 1;
+        world.seekg(0, std::ios_base::end);
+        size_t length = world.tellg();
+        world.seekg(0, std::ios_base::beg);
+
+        if (length < 11)
+        {
+            world.close();
+            return 2;
+        }
+
+        uint8_t* pMem = new uint8_t[length];
+        world.read((char*)pMem, length);
+        world.close();
+
+        if (pMem[0] != 'G' || pMem[1] != 'M' || pMem[2] != 'S' || pMem[3] != 'F')
+            return 3;
+
+        int8_t m_ver = *((int8_t*)(pMem + 4));
+        if (m_ver > 1)
+            return 4;
+        short m_rows = *((short*)(pMem + 8));
+
+        short m_maxRows = (short)(m_fakeTilemap.m_sizeX * floor((float)m_fakeTilemap.m_sizeY / 14.0f));
+
+        if (m_maxRows < m_rows)
+            return 5;
+
+        if (length < 12 + (m_rows * 14))
+            return 6;
+
+        // Verify if we even have a valid tilemap right now..
+        if (m_fakeTilemap.m_tiles.size() != m_fakeTilemap.m_sizeY * m_fakeTilemap.m_sizeX)
+        {
+            m_fakeTilemap.m_tiles.clear();
+            m_fakeTilemap.m_tiles.reserve(m_fakeTilemap.m_sizeY * m_fakeTilemap.m_sizeX);
+            for (int y = 0; y < m_fakeTilemap.m_sizeY; y++)
+            {
+                for (int x = 0; x < m_fakeTilemap.m_sizeX; x++)
+                {
+                    m_fakeTilemap.m_tiles.push_back(Tile());
+                    // RGB #b0e8ff
+                    m_fakeTilemap.m_tiles.back().currentColor = 0xe8ffb0aa;
+                }
+            }
+        }
+
+        int ptr = 12;
+        for (int y = 0; y < 14; y++)
+        {
+            for (int i = 0; i < m_rows; i++)
+            {
+                if (ptr >= length)
+                    return 7;
+                int baseY = (int)floor(i / m_fakeTilemap.m_sizeX) * 14;
+                int noteID = *((int8_t*)(pMem + ptr++));
+                Tile* pTarget =
+                    &m_fakeTilemap.m_tiles[(i % m_fakeTilemap.m_sizeX) + ((baseY + y) * m_fakeTilemap.m_sizeX)];
+                if (noteID == 15)
+                {
+                    // Audio Rack, skip parsing it, since we don't playback or show its data.
+                    // Otherwise the format is: fixed array of 5 - first byte notetype, second byte
+                    // playing position
+                    // Final byte after the note array is volume.
+                    pTarget->m_itemID = 4632;
+                    ptr += 11;
+                }
+                else
+                {
+                    if (noteID >= 0 && noteID <= 33)
+                        pTarget->m_itemBGID = gmsfNoteIDs[noteID];
+                }
+            }
+        }
+        return 0;
+    }
+
+  private:
+    static WorldTileMap m_fakeTilemap;
+    static std::vector<Tile*> m_cameraTiles;
+    static bool m_bModEnabled;
+    static bool m_bDrawingHologram;
+    static bool m_bDrawNotesOnly;
+    static int m_overlayObtrusiveness;
+
+    enum GPMAPTileProperties : unsigned int
+    {
+        GPMAP_PROPERTY_FLIP = 1,
+        GPMAP_PROPERTY_GLUE = 2 << 0,
+        GPMAP_PROPERTY_TOGGLED = 2 << 1,
+        GPMAP_PROPERTY_UNK2 = 2 << 2,
+        GPMAP_PROPERTY_PAINT_AQUA = 2 << 3,
+        GPMAP_PROPERTY_PAINT_PURPLE = 2 << 4,
+        GPMAP_PROPERTY_PAINT_YELLOW = 2 << 5,
+        GPMAP_PROPERTY_PAINT_BLUE = GPMAP_PROPERTY_PAINT_AQUA | GPMAP_PROPERTY_PAINT_PURPLE,
+        GPMAP_PROPERTY_PAINT_GREEN = GPMAP_PROPERTY_PAINT_AQUA | GPMAP_PROPERTY_PAINT_YELLOW,
+        GPMAP_PROPERTY_PAINT_RED = GPMAP_PROPERTY_PAINT_PURPLE | GPMAP_PROPERTY_PAINT_YELLOW,
+        GPMAP_PROPERTY_PAINT_CHARCOAL =
+            GPMAP_PROPERTY_PAINT_AQUA | GPMAP_PROPERTY_PAINT_PURPLE | GPMAP_PROPERTY_PAINT_YELLOW,
+    };
+};
+WorldTileMap Buildomatica::m_fakeTilemap = WorldTileMap();
+std::vector<Tile*> Buildomatica::m_cameraTiles = std::vector<Tile*>();
+bool Buildomatica::m_bModEnabled = true;
+bool Buildomatica::m_bDrawingHologram = false;
+bool Buildomatica::m_bDrawNotesOnly = false;
+int Buildomatica::m_overlayObtrusiveness = 1;
+REGISTER_USER_GAME_PATCH(Buildomatica, buildomatica);

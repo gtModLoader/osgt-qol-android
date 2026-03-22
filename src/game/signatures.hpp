@@ -68,4 +68,6 @@ DEFINE_GAME_FUNCTION(SurfaceAnimBlitScaledAnim, void, void* pAnimSurf, float x, 
                      bool flipX, bool flipY, void* pBatcher, int padding);
 DEFINE_GAME_FUNCTION(DrawFilledRect, void, CL_Rectf const&, uint32_t, float, CL_Vec2f*);
 DEFINE_GAME_FUNCTION(SendPacket, void, int, std::string, void*);
-DEFINE_GAME_FUNCTION(AppGetCachedFileName, std::string*, App*, std::string*, std::string*);
+DEFINE_GAME_FUNCTION(GetSavePath, std::string);
+DEFINE_GAME_FUNCTION(RenderBatcherFlush, void, void*, unsigned int, int64_t);
+DEFINE_GAME_GLOBAL_VAR(g_globalBatcher, void*);

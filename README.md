@@ -30,15 +30,18 @@ Core Patches (always enabled):
 User-facing, most notable/impactful patches:
 - Framerate Unlock patch - Adjusts the game's framerate limit to match the users display refresh rate. Additionally fixes some visuals caused by higher FPS
 - Server Switcher - You can now connect to any server that supports V4.03 and supplies a valid SSL certificate without modifying hosts file with this mod
+- Resizeable Hotbar - Allows you to resize the quick tools hotbar to be up to 10 slots instead of the vanilla 4
+- Buildomatica - Allows you to overlay World Planner files in-game as schematics you can follow. To use, create a folder called "schematics" in your game folder and drop your .GMSF, .gtworld and/or .GMSF files there (may require ADB or root privileges on Android 11+ and newer phones).
 
 User-facing, visible or impactful patches:
 - Legacy Chat patch - Removes the chat tabs and `[S]` symbols
 - Customized Title Screen - Changes the eye-searing sunny weather on title screen to a cozy night weather & adds OSGT-QOL watermark
 - Bubble Opacity Slider - Backport of the modern client bubble opacity feature
 - Locale Switcher - Allows you to change your in-game country flag without having to restart your PC or game
+- Anchor camera to player - Always centers camera around the player including at the world borders. This is disabled by default and can be enabled in the settings in-game.
 
 User-facing patches that don't really impact your gameplay or are made for experimenting:
-- Handle old logon handshakes - Allows the V3.02 to accept all historical logon handshake packets
+- Handle old logon handshakes - Allows the V4.03 to accept all historical logon handshake packets
 - Blood Moon Demo Weather - An experimental extension to game that adds a completely new weather to the game without replacing any existing weather.
 
 ## Credits / Contributors

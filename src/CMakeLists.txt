@@ -67,6 +67,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 ${log-lib}
 and64inline
 boost_signals2
+lzstring
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE

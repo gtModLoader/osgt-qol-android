@@ -45,6 +45,12 @@ template <typename Type> class Vec2
         y += vector.y;
     }
 
+    void operator+(const Vec2& vector)
+    {
+        x += vector.x;
+        y += vector.y;
+    }
+
     Vec2 operator-(const Vec2& vector) const { return Vec2(x - vector.x, y - vector.y); }
     Vec2 operator-(Type value) const { return Vec2(x - value, y - value); }
     Vec2 operator-() const { return Vec2(-x, -y); }
