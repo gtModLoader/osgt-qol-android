@@ -1,10 +1,10 @@
 #pragma once
 #include "And64InlineHook.hpp"
+#include "game/struct/graphics/background.hpp"
 #include "game/struct/variant.hpp"
 #include <dlfcn.h>
 #include <link.h>
 #include <string>
-
 
 // Utility macro for easy declaration of game functions. This will create a global function pointer
 // alias called <name>_t, and create an instance of said function pointer in the real namespace.
@@ -282,6 +282,77 @@ class OptionsManager
     static void OptionsMenuOnSelect(void* pVList);
     static void OnMenuButtonPressed(VariantList*);
     static void OnGemButtonPressed(VariantList*);
+};
+
+// Responsible for providing a standard way to register custom weathers
+typedef Background* (*WeatherCallback)();
+class WeatherManager
+{
+  public:
+    struct CustomWeather
+    {
+        int mappedID;
+        WeatherCallback callback;
+    };
+    struct CustomWeatherEvent
+    {
+        CustomWeather* m_pCustWeather;
+        std::string m_prettyName;
+    };
+    // Get WeatherManager instance
+    static WeatherManager& get();
+
+    // Initialize WeatherManager. This has to be invoked after GameHarness has finished
+    // initialization and the game window has been hidden for patching.
+    // This will resolve and hook all the functions needed to provide an API for weathers
+    void initialize();
+
+    static void refreshItemDB();
+
+    // Registers a weather under WeatherManager. Defaults to unmapped weather ID (-1).
+    // The weather ID is assigned by the server by setting extra file path as
+    // "loader/weather/pretty_name".
+    void registerWeather(std::string prettyName, WeatherCallback pCallback, int weatherID = -1);
+
+    std::map<std::string, CustomWeather> weathers;
+    bool mappedWeathers = false;
+
+    boost::signals2::signal<void(game::WeatherManager::CustomWeatherEvent*)> m_sig_eventSubscribe;
+
+  private:
+    static void WorldRendererForceBackground(uint8_t* this_, int WeatherID, void* unk3, void* unk4);
+};
+
+// For now this just serves as a way to get signalled on events.
+class EventsAPI
+{
+  public:
+    static EventsAPI& get();
+
+    void initialize();
+
+    boost::signals2::signal<void(void)> m_sig_loadFromMem;
+
+    // NOTE: This also fires when dialogs or options is open, mods have to do their own checks if
+    // they care.
+    boost::signals2::signal<void(void)> m_sig_addWasdKeys;
+    boost::signals2::signal<void(VariantList*)> m_sig_onArcadeInput;
+    boost::signals2::signal<void(void*, int, bool)> m_sig_netControllerInput;
+    boost::signals2::signal<void(void*, int64_t, int64_t, int64_t)> m_sig_onMapLoaded;
+    boost::signals2::signal<void(void)> m_sig_postInitVideo;
+    boost::signals2::signal<void(void*, CL_Vec2f*)> m_sig_worldRendererOnRender;
+
+    int acquireKeycode();
+
+  private:
+    static void ItemInfoManagerLoadFromMem(void* this_, char* pBytes, bool arg3);
+    static void OnArcadeInput(VariantList* pVL);
+    static void NetControllerLocalOnArcadeInput(void* this_, int keyCode, bool bKeyFired);
+    static void AddWASDKeys();
+    static void OnMapLoaded(void* this_, int64_t p1, int64_t p2, int64_t p3);
+    static void WorldRendererOnRender(void* this_, CL_Vec2f*);
+
+    int m_lastKeycode;
 };
 
 } // namespace game

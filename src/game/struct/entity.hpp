@@ -317,5 +317,6 @@ class Entity : public boost::signals2::trackable
     Variant* m_pPosVarCache;
     CL_Vec2f* m_pSizeCache;
     uint32_t* m_pAlignment;
+    uint8_t pad[24];
 };
-static_assert(sizeof(Entity) == 336, "Entity mismatch, expected 336.");
+static_assert(sizeof(Entity) == 360, "Entity mismatch, expected 360.");

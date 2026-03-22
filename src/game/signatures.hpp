@@ -13,6 +13,10 @@
     extern ret name;                                                                                                   \
     }
 
+// Defined in options.cpp
+DEFINE_GAME_FUNCTION(GetScreenSizeXf, float);
+DEFINE_GAME_FUNCTION(GetScreenSizeYf, float);
+// Defined in signatures.cpp
 DEFINE_GAME_FUNCTION(GetApp, App*);
 DEFINE_GAME_FUNCTION(VariantDBPrint, void, VariantDB*);
 DEFINE_GAME_FUNCTION(VariantDBGetFunction, FunctionObject*, VariantDB*, std::string const& key);
@@ -23,6 +27,7 @@ DEFINE_GAME_FUNCTION(VariantDBGetVarWithDefault, Variant*, VariantDB*, std::stri
 DEFINE_GAME_FUNCTION(VariantDBGetVar, Variant*, VariantDB*, std::string const& key);
 DEFINE_GAME_FUNCTION(VariantDBDeleteVar, void, VariantDB*, std::string const& key);
 DEFINE_GAME_FUNCTION(VariantDBDeleteAll, void, VariantDB*);
+DEFINE_GAME_FUNCTION(VariantSetStr, void, Variant*, std::string const& key);
 DEFINE_GAME_FUNCTION(GetFontAndScaleToFitThisLinesPerScreenY, void, uint32_t&, float&, float);
 DEFINE_GAME_FUNCTION(CreateTextLabelEntity, Entity*, Entity*, std::string const&, float, float, std::string const&);
 DEFINE_GAME_FUNCTION(SetupTextEntity, Entity*, Entity*, uint32_t, float);
@@ -34,3 +39,17 @@ DEFINE_GAME_FUNCTION(LogToConsole, void, const char*...);
 DEFINE_GAME_FUNCTION(iPhoneMapX, float, float);
 DEFINE_GAME_FUNCTION(FadeInEntity, void, Entity*, bool, int, int, float, int);
 DEFINE_GAME_FUNCTION(ResizeScrollBounds, void, VariantList*);
+DEFINE_GAME_FUNCTION(SurfaceCtor, void*, void*);
+DEFINE_GAME_FUNCTION(SurfaceDtor, void, void*);
+DEFINE_GAME_FUNCTION(SurfaceLoadFile, bool, void*, std::string, bool);
+DEFINE_GAME_FUNCTION(SurfaceBlitScaled, void, void* pSurf, float x, float y, CL_Vec2f& vScale, int alignment,
+                     unsigned int rgba, float rotation, void* pRenderBatcher, bool flipX, bool flipY);
+DEFINE_GAME_FUNCTION(SurfaceKill, void, void*);
+DEFINE_GAME_FUNCTION(SurfaceAnimCtor, void*, void*);
+DEFINE_GAME_FUNCTION(SurfaceAnimDtor, void, void*);
+DEFINE_GAME_FUNCTION(SurfaceAnimBlitScaledAnim, void, void* pAnimSurf, float x, float y, int frameX, int frameY,
+                     CL_Vec2f* vScale, int alignment, unsigned int rgba, float rotation, CL_Vec2f* vRotationPt,
+                     bool flipX, bool flipY, void* pBatcher, int padding);
+DEFINE_GAME_FUNCTION(DrawFilledRect, void, CL_Rectf const&, uint32_t, float, CL_Vec2f*);
+DEFINE_GAME_FUNCTION(SendPacket, void, int, std::string, void*);
+DEFINE_GAME_FUNCTION(AppGetCachedFileName, std::string*, App*, std::string*, std::string*);

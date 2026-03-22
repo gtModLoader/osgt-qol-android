@@ -66,6 +66,6 @@ void fillMemory(void* address, size_t size, uint8_t value)
     memset(address, value, size);
 }
 
-void nopMemory(void* address) { writeMemoryPattern(address, "1F 20 03 D5"); }
+void nopInstruction(void* address) { writeMemoryPattern(address, "1F 20 03 D5"); }
 
 } // namespace utils

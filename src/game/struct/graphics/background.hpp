@@ -1,4 +1,5 @@
 #pragma once
+#include "game/struct/loopingsound.hpp"
 #include "game/struct/variant.hpp"
 #include "game/struct/vec.hpp"
 
@@ -34,7 +35,7 @@ class Background : public boost::signals2::trackable
     CL_Vec2f m_scale = CL_Vec2f(1.0f, 1.0f);
 
     Rectf m_worldRect;
-    /*LoopingSound m_loopingSound;
-    float m_sfxBaseVolume = 0.25f;*/
+    LoopingSound m_loopingSound;
+    float m_sfxBaseVolume = 0.25f;
 };
-// static_assert(sizeof(Background) == 264, "Background class size mismatch.");
+static_assert(sizeof(Background) == 160, "Background class size mismatch.");

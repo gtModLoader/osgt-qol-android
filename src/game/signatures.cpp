@@ -2,7 +2,6 @@
 #include "dlfcn.h"
 #include "game.hpp"
 
-
 REGISTER_GAME_FUNCTION(GetApp, "_Z6GetAppv", App*);
 REGISTER_GAME_FUNCTION(VariantDBPrint, "_ZN9VariantDB5PrintEv", void, VariantDB*);
 REGISTER_GAME_FUNCTION(VariantDBGetFunction, "_ZN9VariantDB11GetFunctionERKSs", FunctionObject*, VariantDB*,
@@ -18,6 +17,7 @@ REGISTER_GAME_FUNCTION(VariantDBGetVarWithDefault, "_ZN9VariantDB17GetVarWithDef
 REGISTER_GAME_FUNCTION(VariantDBGetVar, "_ZN9VariantDB6GetVarERKSs", Variant*, VariantDB*, std::string const& key);
 REGISTER_GAME_FUNCTION(VariantDBDeleteVar, "_ZN9VariantDB9DeleteVarERKSs", void, VariantDB*, std::string const& key);
 REGISTER_GAME_FUNCTION(VariantDBDeleteAll, "_ZN9VariantDB9DeleteAllEv", void, VariantDB*);
+REGISTER_GAME_FUNCTION(VariantSetStr, "_ZN7Variant3SetERKSs", void, Variant*, std::string const& key);
 
 REGISTER_GAME_FUNCTION(GetFontAndScaleToFitThisLinesPerScreenY, "_Z39GetFontAndScaleToFitThisLinesPerScreenYP5eFontPff",
                        void, uint32_t&, float&, float);
@@ -33,6 +33,25 @@ REGISTER_GAME_FUNCTION(LogToConsole, "_Z12LogToConsolePKcz", void, const char*..
 REGISTER_GAME_FUNCTION(FadeInEntity, "_Z12FadeInEntityP6Entitybiif13eTimingSystem", void, Entity*, bool, int, int,
                        float, int);
 REGISTER_GAME_FUNCTION(ResizeScrollBounds, "_Z18ResizeScrollBoundsP11VariantList", void, VariantList*);
+REGISTER_GAME_FUNCTION(SurfaceCtor, "_ZN7SurfaceC1Ev", void*, void*);
+REGISTER_GAME_FUNCTION(SurfaceDtor, "_ZN7SurfaceD1Ev", void, void*);
+REGISTER_GAME_FUNCTION(SurfaceLoadFile, "_ZN7Surface8LoadFileESsb", bool, void*, std::string, bool);
+REGISTER_GAME_FUNCTION(SurfaceBlitScaled, "_ZN7Surface10BlitScaledEff7CL_Vec2IfE10eAlignmentjfP13RenderBatcherbb", void,
+                       void* pSurf, float x, float y, CL_Vec2f& vScale, int alignment, unsigned int rgba,
+                       float rotation, void* pRenderBatcher, bool flipX, bool flipY);
+REGISTER_GAME_FUNCTION(SurfaceKill, "_ZN7Surface4KillEv", void, void*);
+REGISTER_GAME_FUNCTION(SurfaceAnimCtor, "_ZN11SurfaceAnimC1Ev", void*, void*);
+REGISTER_GAME_FUNCTION(SurfaceAnimDtor, "_ZN11SurfaceAnimD1Ev", void, void*);
+REGISTER_GAME_FUNCTION(SurfaceAnimBlitScaledAnim,
+                       "_ZN11SurfaceAnim14BlitScaledAnimEffii7CL_Vec2IfE10eAlignmentjfS1_bbP13RenderBatcheri", void,
+                       void* pAnimSurf, float x, float y, int frameX, int frameY, CL_Vec2f* vScale, int alignment,
+                       unsigned int rgba, float rotation, CL_Vec2f* vRotationPt, bool flipX, bool flipY, void* pBatcher,
+                       int padding);
+REGISTER_GAME_FUNCTION(DrawFilledRect, "_Z14DrawFilledRectRK8CL_Rectfjf7CL_Vec2IfE", void, CL_Rectf const&, uint32_t,
+                       float, CL_Vec2f*);
+REGISTER_GAME_FUNCTION(SendPacket, "_Z10SendPacket15eNetMessageTypeRKSsP9_ENetPeer", void, int, std::string, void*);
+REGISTER_GAME_FUNCTION(AppGetCachedFileName, "_ZN3App17GetCachedFileNameESs", std::string*, App*, std::string*,
+                       std::string*);
 
 #define RESOLVE_DIR_SYMBOL(name) real::name = (name##_t)dlsym(handle, pattern::name.c_str());
 namespace game
@@ -50,6 +69,7 @@ void GameHarness::resolveSharedSigs()
     RESOLVE_DIR_SYMBOL(VariantDBGetVar);
     RESOLVE_DIR_SYMBOL(VariantDBDeleteVar);
     RESOLVE_DIR_SYMBOL(VariantDBDeleteAll);
+    RESOLVE_DIR_SYMBOL(VariantSetStr);
 
     RESOLVE_DIR_SYMBOL(GetFontAndScaleToFitThisLinesPerScreenY);
     RESOLVE_DIR_SYMBOL(CreateTextLabelEntity);
@@ -60,5 +80,18 @@ void GameHarness::resolveSharedSigs()
     RESOLVE_DIR_SYMBOL(LogToConsole);
     RESOLVE_DIR_SYMBOL(FadeInEntity);
     RESOLVE_DIR_SYMBOL(ResizeScrollBounds);
+
+    RESOLVE_DIR_SYMBOL(SurfaceCtor);
+    RESOLVE_DIR_SYMBOL(SurfaceDtor);
+    RESOLVE_DIR_SYMBOL(SurfaceLoadFile);
+    RESOLVE_DIR_SYMBOL(SurfaceBlitScaled);
+    RESOLVE_DIR_SYMBOL(SurfaceKill);
+    RESOLVE_DIR_SYMBOL(SurfaceAnimCtor);
+    RESOLVE_DIR_SYMBOL(SurfaceAnimDtor);
+    RESOLVE_DIR_SYMBOL(SurfaceAnimBlitScaledAnim);
+
+    RESOLVE_DIR_SYMBOL(DrawFilledRect);
+    RESOLVE_DIR_SYMBOL(SendPacket);
+    RESOLVE_DIR_SYMBOL(AppGetCachedFileName);
 }
 } // namespace game

@@ -16,11 +16,12 @@ class FramerateUnlockPatch : public patch::BasePatch
         // Hook SetFPSLimit.
         game.hookFunction<SetFPSLimit_t>(game.resolveSymbol(pattern::SetFPSLimit), SetFPSLimit, &real::SetFPSLimit);
 
-        auto& options = game::OptionsManager::get();
-        options.addMultiChoiceOption("qol", "Performance", "osgt_qol_fps_mode",
-                                     "Max Framerate (may be capped by your device)", g_fpsOptions, &OnFPSChangeCallback,
-                                     80.0f);
-        options.addCheckboxOption("qol", "Performance", "osgt_qol_fps_show", "Show the FPS counter", &ToggleFPSCounter);
+        auto& optionsMgr = game::OptionsManager::get();
+        optionsMgr.addMultiChoiceOption("qol", "Performance", "osgt_qol_fps_mode",
+                                        "Max Framerate (may be capped by your device)", g_fpsOptions,
+                                        &OnFPSChangeCallback, 80.0f);
+        optionsMgr.addCheckboxOption("qol", "Performance", "osgt_qol_fps_show", "Show the FPS counter",
+                                     &ToggleFPSCounter);
     }
 
     static void OnFPSChangeCallback(VariantList* pVariant)
@@ -60,7 +61,7 @@ class FramerateUnlockPatch : public patch::BasePatch
 
     static void SetFPSLimit(void* app, float fps)
     {
-        real::GetApp()->m_bShowFPS = real::GetApp()->GetVar("osgt_qol_fps_show")->GetUINT32() == 1;
+        real::GetApp()->m_bFPSVisible = real::GetApp()->GetVar("osgt_qol_fps_show")->GetUINT32() == 1;
         Variant* pVar = real::GetApp()->GetVar("osgt_qol_fps_mode");
         if (pVar->GetType() == Variant::TYPE_UNUSED)
             pVar->Set(1U); // Default to 90 fps.

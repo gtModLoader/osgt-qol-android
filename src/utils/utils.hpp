@@ -1,12 +1,19 @@
 #pragma once
 #include <android/log.h>
-#include <vector>
+#include <cstring>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #define LOG_TAG "GROWTOPIA-OSGT-QOL-ANDROID"
 #define LOG_DEBUG(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define RESOLVE_SYMBOL(name) real::name = (name##_t)game.resolveSymbol(pattern::name); \
-if (real::name == nullptr) { LOG_DEBUG("WARN: Couldn't solve symbol name"); }
+#define LOG_ERROR(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define RESOLVE_SYMBOL(name)                                                                                           \
+    real::name = (name##_t)game.resolveSymbol(pattern::name);                                                          \
+    if (real::name == nullptr)                                                                                         \
+    {                                                                                                                  \
+        LOG_DEBUG("WARN: Couldn't solve symbol name");                                                                 \
+    }
 
 // Taken from And64InlineHook
 #include <sys/mman.h>
@@ -48,7 +55,61 @@ void writeMemoryBuffer(void* address, const void* data, size_t size);
 // the pattern.
 void writeMemoryPattern(void* address, const std::string& pattern);
 
+// Fill a memory region with a specific value.
+void fillMemory(void* address, size_t size, uint8_t value);
+
 // Shorthand for writeMemoryPattern(address, "1F 20 03 D5").
-void nopMemory(void* address);
+void nopInstruction(void* address);
+
+template <typename T> inline T resolveAdrpAddToAddress(void* address);
 
 } // namespace utils
+
+template <typename T> inline T utils::resolveAdrpAddToAddress(void* address)
+{
+    // Resolves ADRP + ADD sequence used to calculate a pointer from 2x 32-bit instructions.
+    uint8_t* ptr = reinterpret_cast<uint8_t*>(address);
+    if (ptr == NULL)
+        throw std::invalid_argument("Address does not point to valid memory.");
+
+    uint32_t adrp_op, add_op;
+    std::memcpy(&adrp_op, ptr, 4);
+    std::memcpy(&add_op, ptr + 4, 4);
+
+    // Check if it's an ADRP (bits 31, 28:24 must be 1 10000)
+    bool isAdrp = (adrp_op & 0x9F000000) == 0x90000000;
+    // Check if it's an ADD immediate (bits 31:22 must be 1 001000100)
+    bool isAdd = (add_op & 0xFFC00000) == 0x91000000;
+
+    if (!isAdrp || !isAdd)
+        throw std::invalid_argument("Address does not point to ADRP+ADD instructions.");
+
+    // Destination register of ADRP (bits 4:0)
+    uint32_t adrp_rd = adrp_op & 0x1F;
+    // Source register of ADD (bits 9:5)
+    uint32_t add_rn = (add_op >> 5) & 0x1F;
+
+    if (adrp_rd != add_rn)
+        throw std::invalid_argument("ADRP destination does not match ADD source register.");
+
+    // Resolve ADRP to a page
+    // Extract immhi (bits 23:5) and immlo (bits 30:29)
+    uint64_t immhi = (adrp_op >> 5) & 0x7FFFF;
+    uint64_t immlo = (adrp_op >> 29) & 0x3;
+
+    // Combine into a 21-bit signed immediate
+    int64_t imm = (int64_t)((immhi << 2) | immlo);
+
+    // Sign extend from 21 bits to 64 bits
+    if (imm & 0x100000)
+        imm |= ~0x1FFFFF;
+    uint64_t page = (reinterpret_cast<uint64_t>(ptr) & ~0xFFFULL) + (imm << 12);
+
+    // Get offset from ADD, extracted from 12-bit immediate (bits 21:10)
+    uint32_t offset = (add_op >> 10) & 0xFFF;
+    if ((add_op >> 22) & 1)
+        offset <<= 12;
+
+    // Add together page and offset and that's the destination.
+    return reinterpret_cast<T>(page + offset);
+}

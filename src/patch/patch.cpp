@@ -46,6 +46,7 @@ void PatchManager::applyPatch(const std::string& name)
     }
     catch (const std::exception& e)
     {
+        LOG_ERROR("Failed to apply patch %s: %s", name.c_str(), e.what());
         throw std::runtime_error("Failed to apply patch " + name + ": " + e.what());
     }
 }

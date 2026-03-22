@@ -1,15 +1,26 @@
 set(SOURCES
     main.cpp
+    game/events.cpp
     game/game.cpp
     game/options.cpp
     game/signatures.cpp
-    game/struct/variantdb.cpp
+    game/weathermanager.cpp
     game/struct/entityutils.cpp
+    game/struct/miscutils.cpp
+    game/struct/renderutils.cpp
+    game/struct/variant.cpp
+    game/struct/variantdb.cpp
+    game/struct/graphics/background.cpp
+    game/struct/graphics/background_blood.cpp
+    game/struct/graphics/background_clouds.cpp
+    game/struct/graphics/background_default.cpp
+    game/struct/graphics/surface.cpp
     patch/patch.cpp
     utils/utils.cpp
 )
 
 set(SOURCES_USER_PATCHES
+    patch/user/chat.cpp
     patch/user/framerate.cpp
     patch/user/net.cpp
     patch/user/render.cpp

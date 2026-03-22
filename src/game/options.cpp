@@ -2,13 +2,12 @@
 #include "game/struct/entity.hpp"
 #include "game/struct/entityutils.hpp"
 #include "signatures.hpp"
+#include "struct/renderutils.hpp"
 #include "struct/rtrect.hpp"
 #include "struct/variant.hpp"
 
 REGISTER_GAME_FUNCTION(GetScreenSizeXf, "_Z15GetScreenSizeXfv", float);
 REGISTER_GAME_FUNCTION(GetScreenSizeYf, "_Z15GetScreenSizeYfv", float);
-
-Rectf GetScreenRect() { return Rectf(0.0, 0.0, real::GetScreenSizeXf(), real::GetScreenSizeYf()); }
 
 REGISTER_GAME_FUNCTION(CreateOverlayEntity, "_Z19CreateOverlayEntityP6EntitySsSsff", Entity*, Entity* pParentEnt,
                        std::string const& name, std::string const& fileName, float x, float y);
@@ -26,9 +25,11 @@ REGISTER_GAME_FUNCTION(OptionsMenuAddContent,
 
 // CreateSlider
 // NOTE: Need to investigate the final strings. They're not there originally in Proton SDK.
+/* CreateSlider(Entity*, float, float, float, std::string, std::string, std::string, std::string,
+   std::string, bool, std::string, std::string) */
 REGISTER_GAME_FUNCTION(CreateSlider, "_Z12CreateSliderP6EntityfffSsSsSsSsSsbSsSs", EntityComponent*, Entity* pBG,
                        float x, float y, float sizeX, std::string const& buttonFileName, std::string const& left,
-                       std::string const& middle, std::string const& right, std::string const&, std::string const&,
+                       std::string const& middle, std::string const& right, std::string const&, bool,
                        std::string const&, std::string const&);
 
 // CreateCheckbox
@@ -141,10 +142,19 @@ void OptionsManager::renderSlider(OptionsManager::GameOption& optionDef, void* p
     if (vSixeX < 768.80f)
         vSixeX = 768.80f;
 
+#ifdef ANDROID
+    // Workaround for now since you can't apply defaults in apply on android. Might have to add something for that stage
+    // specifically.
+    Variant* pSaveVar = real::GetApp()->GetVar(optionDef.varName);
+    if (pSaveVar->GetType() == Variant::TYPE_UNUSED)
+        pSaveVar->Set(1.0f);
+#endif
+
     // The final 4 string args aren't there in Proton, but they are in client. Currently they don't
     // seem to have much use.
-    EntityComponent* pSliderComp = real::CreateSlider(pEnt, vPosX, vPosY, vSixeX, "interface/slider_button.rttex",
-                                                      "Min", optionDef.displayName, "Max", "", "", "", "");
+    EntityComponent* pSliderComp =
+        real::CreateSlider(pEnt, vPosX, vPosY, vSixeX, "interface/slider_button.rttex", "Min", optionDef.displayName,
+                           "Max", "", false, "", "CustomSlider");
 
     CL_Vec2f vSliderSize = pSliderComp->GetParent()->GetVar("size2d")->GetVector2();
     // If we have a hint string assigned, we'll display it below the slider, helps with centering
