@@ -39,6 +39,11 @@ REGISTER_GAME_FUNCTION(BackgroundSurgery, "_ZN18Background_SurgeryC2Ev", Backgro
 REGISTER_GAME_FUNCTION(BackgroundBountiful, "_ZN20Background_BountifulC2Ev", Background*, void*);
 REGISTER_GAME_FUNCTION(DrawFilledBitmapRect, "_Z20DrawFilledBitmapRectR6rtRectjjP11SurfaceAnimb", void, rtRectf&,
                        uint32_t, uint32_t, void*, bool);
+REGISTER_GAME_FUNCTION(AvatarDataGetSetAsUint16, "_ZN10AvatarData22GetClothingSetAsUint16EPt", void, void*, uint16_t*);
+REGISTER_GAME_FUNCTION(WorldRendererTileLineOfSight, "_ZN13WorldRenderer15TileLineOfSightEP4TileS1_fPf", bool, void*,
+                       Tile*, Tile*, float, float*);
+REGISTER_GAME_FUNCTION(WorldRendererDrawTiles, "_ZN13WorldRenderer9DrawTilesERSt6vectorIP4TileSaIS2_EEi", void, void*,
+                       std::vector<Tile*>*, int);
 REGISTER_GAME_FUNCTION(WorldCameraOnUpdate, "_ZN11WorldCamera8OnUpdateE7CL_Vec2IfES1_", void, WorldCamera*, CL_Vec2f*,
                        CL_Vec2f*);
 REGISTER_GAME_FUNCTION(WorldCameraGetCamWorldPos, "_ZN11WorldCamera14GetCamWorldPosEv", CL_Vec2f*, WorldCamera*);
@@ -421,6 +426,220 @@ class BloodMoonDemoWeather : public patch::BasePatch
     static Background* onWeatherCreate() { return new Background_Blood(); }
 };
 REGISTER_USER_GAME_PATCH(BloodMoonDemoWeather, blood_moon_demo_weather);
+
+class DaVinciFakeID : public patch::BasePatch
+{
+  public:
+    void apply() const override
+    {
+        // Modifies avatars to portray old Da Vinci Wings ID as new one.
+        // Cosmetic issue with this approach is that it shows as unequipped in inventory.
+        auto& game = game::GameHarness::get();
+        game.hookFunctionPattern<AvatarDataGetSetAsUint16_t>(pattern::AvatarDataGetSetAsUint16,
+                                                             AvatarDataGetSetAsUint16, &real::AvatarDataGetSetAsUint16);
+    }
+
+    static void AvatarDataGetSetAsUint16(void* this_, uint16_t* set)
+    {
+        real::AvatarDataGetSetAsUint16(this_, set);
+        if (set[6] == 3308)
+            set[6] = 8286;
+    }
+};
+REGISTER_USER_GAME_PATCH(DaVinciFakeID, fake_davinci_id);
+
+static bool g_bLightSourcesOptimized = true;
+static int g_fLightSourceOptimizeLevel = 5;
+class LightSourceOptimizer : public patch::BasePatch
+{
+  public:
+    void apply() const override
+    {
+        // The way Growtopia calculates where light should spread is very inefficient - for every
+        // light source, it will scan the entire tilemap in your viewport. That is rather expensive
+        // with a ton of light emitters on a large zoom (such as mod zoom).
+        //
+        // This mod partially rewrites that logic by instead doing a maximum 5x5 rectangular search
+        // for darkened tiles and applies light calculation to them only.
+        //
+        // From the PC version, performance metrics:
+        // On a machine using Ryzen 7 8845HS with Radeon 780M - the performance difference on a
+        // 100x56 area full of Chandelier blocks. For control to see efficiency of the light
+        // calculations, a reference world with same parameters was created, but instead of
+        // Chandelier (a light emitter, animated block), it was filled with Party Cacti (non-light
+        // emitter, animated block).
+        //
+        // Unpatched: 10-11 FPS
+        // Patched: 158-172 FPS
+        // Reference world: 168-178 FPS
+        // Frame cap: 200 FPS (240 Hz)
+
+        auto& game = game::GameHarness::get();
+
+        game.hookFunctionPattern<WorldRendererDrawTiles_t>(pattern::WorldRendererDrawTiles, WorldRendererDrawTiles,
+                                                           &real::WorldRendererDrawTiles);
+
+        RESOLVE_SYMBOL(WorldRendererTileLineOfSight);
+
+        auto& optionsMgr = game::OptionsManager::get();
+        optionsMgr.addCheckboxOption("qol", "Performance", "osgt_qol_lightopt_enabled", "Optimize Light Emitters",
+                                     &LightOptimizerToggle);
+        optionsMgr.addSliderOption("qol", "Performance", "osgt_qol_lightopt_rad", "Light Emitter Strength",
+                                   &LightOptimizerSlider, "`5(See more at expense of fps)``");
+
+        auto& events = game::EventsAPI::get();
+        events.m_sig_postInit.connect(&applyPostInit);
+    }
+
+    static void applyPostInit()
+    {
+        Variant* pVariant = real::GetApp()->GetVar("osgt_qol_lightopt_rad");
+        if (pVariant->GetType() != Variant::TYPE_FLOAT)
+            pVariant->Set(1.00f);
+        else
+            g_fLightSourceOptimizeLevel = (int)(pVariant->GetFloat() * 5.0f);
+
+        pVariant = real::GetApp()->GetVar("osgt_qol_lightopt_enabled");
+        if (pVariant->GetType() != Variant::TYPE_UINT32)
+            pVariant->Set(uint32_t(1));
+        else
+            g_bLightSourcesOptimized = pVariant->GetUINT32() == 1;
+    }
+
+    static void LightOptimizerSlider(Variant* pVariant)
+    {
+        // We scale float 0.0-1.0 to 0-5 radius during light calculation.
+        float origLvl = pVariant->GetFloat();
+        if (origLvl >= 1.0f)
+        {
+            g_fLightSourceOptimizeLevel = 5;
+            real::GetApp()->GetVar("osgt_qol_lightopt_rad")->Set(origLvl);
+        }
+        else
+        {
+            float radLvl = float(uint32_t(origLvl * 5.0f)) / 5.0f;
+            g_fLightSourceOptimizeLevel = (int)(radLvl * 5.0f);
+            real::GetApp()->GetVar("osgt_qol_lightopt_rad")->Set(radLvl);
+        }
+    }
+
+    static void LightOptimizerToggle(VariantList* pVariant)
+    {
+        Entity* pCheckbox = pVariant->Get(1).GetEntity();
+        bool bChecked = pCheckbox->GetVar("checked")->GetUINT32() != 0;
+        g_bLightSourcesOptimized = bChecked;
+        real::GetApp()->GetVar("osgt_qol_lightopt_enabled")->Set(uint32_t(bChecked));
+    }
+
+    static void WorldRendererDrawTiles(void* this_, std::vector<Tile*>* tiles, int unk3)
+    {
+        // Disarm original light calc logic by tricking original renderer.
+        // We will be doing our own "light pass" before calling DrawTiles itself.
+        if (unk3 == 0 || !g_bLightSourcesOptimized)
+        {
+            real::WorldRendererDrawTiles(this_, tiles, unk3);
+            return;
+        }
+        // This value happens to dictate if DrawTiles will calculate light levels, so we can
+        // temporarily assign it to a value where it won't do that, we will be doing the light
+        // calculation pass instead.
+        float original = *(float*)(((__int64_t)this_) + 0x15c);
+        *(float*)(((__int64_t)this_) + 0x15c) = 0.1f;
+
+        std::vector<ItemInfo>& items = real::GetApp()->GetItemInfoManager()->m_itemInfo;
+        int w = real::GetApp()->GetGameLogic()->GetTileWidth();
+        int h = real::GetApp()->GetGameLogic()->GetTileHeight();
+        WorldTileMap* tilemap = (WorldTileMap*)real::GetApp()->GetGameLogic()->GetTileMap();
+        size_t max = tiles->size();
+
+        int r = g_fLightSourceOptimizeLevel;
+
+        int m_timeMS = real::GetApp()->m_gameTimer.m_timeMS;
+
+        for (size_t i = 0; i < max; i++)
+        {
+            Tile* tile = (*tiles)[i];
+            int vis = items[tile->m_itemID].m_visualEffect;
+            // Lightsource / Lightsource Pulse / Lightsource If On
+            if ((vis == 34 || vis == 45) || (vis == 35 && (tile->m_flags & 64)))
+            {
+                int x = tile->x;
+                int y = tile->y;
+
+                // Interpolation logic same as original.
+                float lightStrength = SinPulseByCustomTimerMS(4000, (x + y) * 100 + m_timeMS);
+                lightStrength = (lightStrength * 0.25f + 1.0f) * 128.0f;
+
+                int minX = x - r;
+                if (minX < 0)
+                    minX = 0;
+                int maxX = x + r;
+                if (maxX > w)
+                    maxX = w;
+
+                int minY = y - r;
+                if (minY < 0)
+                    minY = 0;
+                int maxY = y + r;
+                if (maxY > h)
+                    maxY = h;
+
+                Tile* target = nullptr;
+                for (x = minX; x < maxX; x++)
+                {
+                    for (y = minY; y < maxY; y++)
+                    {
+                        target = &tilemap->m_tiles[x + (y * w)];
+                        vis = items[target->m_itemBGID].m_visualEffect;
+                        // Only do light calculations if we're on a darkened tile.
+                        if (vis == 33 || vis == 41)
+                        {
+                            // If we are on a light source, we are already on light level 0.0, skip
+                            // a no-op.
+                            if (target->m_lightLevel > 0.0f)
+                            {
+                                float rayPower;
+                                if (real::WorldRendererTileLineOfSight(this_, tile, target, lightStrength, &rayPower))
+                                {
+                                    // Game resets tile->m_lightLevel across the board on each
+                                    // render cycle, so we don't need to worry about perma-stuck
+                                    // light tiles.
+                                    float light = rayPower / lightStrength;
+                                    if (light < target->m_lightLevel)
+                                        target->m_lightLevel = light;
+                                }
+                            }
+                        }
+                    }
+                }
+                tile->m_lightLevel = 0.0;
+            }
+        }
+        real::WorldRendererDrawTiles(this_, tiles, unk3);
+        *(float*)(((__int64_t)this_) + 0x15c) = original;
+    }
+};
+REGISTER_USER_GAME_PATCH(LightSourceOptimizer, lightsource_optimized);
+
+class InstantWorldButtonsPatch : public patch::BasePatch
+{
+  public:
+    void apply() const override
+    {
+        auto& game = game::GameHarness::get();
+
+        // This effectively does almost same thing as the PC version, but we put "1" value directly into params which
+        // get loaded into appropriate registers next and effectively make world buttons instant.
+        void* floaterAddr = (void*)dlsym(game.getGameHandle(),
+                                         "_Z10AddFloateriP6EntityRfS1_8CL_RectfSsRKSsifjRSt6vectorIS0_SaIS0_EERiRb");
+        utils::writeMemoryPattern((void*)((int64_t)floaterAddr + 1788), "20 00 80 52");
+        utils::nopInstruction((void*)((int64_t)floaterAddr + 1792), 2);
+
+        utils::writeMemoryPattern((void*)((int64_t)floaterAddr + 1804), "20 00 80 52");
+        utils::nopInstruction((void*)((int64_t)floaterAddr + 1808), 2);
+    }
+};
+REGISTER_USER_GAME_PATCH(InstantWorldButtonsPatch, instant_world_buttons);
 
 class AnchorCameraToPlayerPatch : public patch::BasePatch
 {

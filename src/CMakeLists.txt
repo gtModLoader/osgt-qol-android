@@ -30,6 +30,7 @@ set(SOURCES_USER_PATCHES
 
 set(SOURCES_CORE_PATCHES
     patch/core/about.cpp
+    patch/core/integrity.cpp
     patch/core/version.cpp
 )
 add_library(${PROJECT_NAME} SHARED
