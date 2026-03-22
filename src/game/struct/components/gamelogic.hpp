@@ -18,6 +18,8 @@ class GameLogicComponent : public EntityComponent
         PlayerItems m_playerItems;
         uint8_t pad3[80];
         void* m_pTradeMenu; // 728
-        uint8_t pad4[544];
+        uint8_t pad4[132];
+        bool m_ClashEventIsActive;
+        uint8_t pad5[411];
 };
 static_assert(sizeof(GameLogicComponent) == 1280, "GameLogicComponent class size mismatch.");

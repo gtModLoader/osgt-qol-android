@@ -52,6 +52,8 @@ REGISTER_GAME_FUNCTION(SurfaceAnimBlitScaledAnim,
                        void* pAnimSurf, float x, float y, int frameX, int frameY, CL_Vec2f* vScale, int alignment,
                        unsigned int rgba, float rotation, CL_Vec2f* vRotationPt, bool flipX, bool flipY, void* pBatcher,
                        int padding);
+REGISTER_GAME_FUNCTION(SetupEntityIconFromItem, "_Z23SetupEntityIconFromItemP8ItemInfoP6Entity7CL_Vec2IfEib", Entity*,
+                       int* ItemID, Entity* ParentEntity, CL_Vec2f* Position, int, bool bDrawBorder);
 REGISTER_GAME_FUNCTION(DrawFilledRect, "_Z14DrawFilledRectRK8CL_Rectfjf7CL_Vec2IfE", void, CL_Rectf const&, uint32_t,
                        float, CL_Vec2f*);
 REGISTER_GAME_FUNCTION(SendPacket, "_Z10SendPacket15eNetMessageTypeRKSsP9_ENetPeer", void, int, std::string, void*);
@@ -98,6 +100,8 @@ void GameHarness::resolveSharedSigs()
     RESOLVE_DIR_SYMBOL(SurfaceAnimCtor);
     RESOLVE_DIR_SYMBOL(SurfaceAnimDtor);
     RESOLVE_DIR_SYMBOL(SurfaceAnimBlitScaledAnim);
+
+    RESOLVE_DIR_SYMBOL(SetupEntityIconFromItem);
 
     RESOLVE_DIR_SYMBOL(DrawFilledRect);
     RESOLVE_DIR_SYMBOL(SendPacket);

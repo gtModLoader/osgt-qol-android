@@ -25,10 +25,12 @@ set(SOURCES_USER_PATCHES
     patch/user/framerate.cpp
     patch/user/net.cpp
     patch/user/render.cpp
+    patch/user/playmodoverlay.cpp
 )
 
 set(SOURCES_CORE_PATCHES
     patch/core/about.cpp
+    patch/core/version.cpp
 )
 add_library(${PROJECT_NAME} SHARED
     ${SOURCES}

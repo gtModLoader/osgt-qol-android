@@ -1,9 +1,8 @@
 #pragma once
-#include "game/struct/enetclient.hpp"
 #include "game/struct/baseapp.hpp"
+#include "game/struct/enetclient.hpp"
 #include "game/struct/iteminfomanager.hpp"
 #include "game/struct/variantdb.hpp"
-
 
 class GameLogicComponent;
 class App : public BaseApp
@@ -25,4 +24,6 @@ class App : public BaseApp
     ENetClient* m_pClient;
     uint8_t pad2[176];
     VariantDB m_sharedDB; // 3552
+    uint8_t pad3[360];
+    int m_serverProtocol; // 4040
 };

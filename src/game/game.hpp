@@ -340,6 +340,7 @@ class EventsAPI
     boost::signals2::signal<void(void*, int64_t, int64_t, int64_t)> m_sig_onMapLoaded;
     boost::signals2::signal<void(void)> m_sig_postInitVideo;
     boost::signals2::signal<void(void*, CL_Vec2f*)> m_sig_worldRendererOnRender;
+    boost::signals2::signal<void(void)> m_sig_postInit;
 
     int acquireKeycode();
 
@@ -350,6 +351,7 @@ class EventsAPI
     static void AddWASDKeys();
     static void OnMapLoaded(void* this_, int64_t p1, int64_t p2, int64_t p3);
     static void WorldRendererOnRender(void* this_, CL_Vec2f*);
+    static void AppInit(void* this_);
 
     int m_lastKeycode;
 };

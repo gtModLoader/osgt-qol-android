@@ -12,6 +12,7 @@ REGISTER_GAME_FUNCTION(AddKeyBinding, "_Z13AddKeyBindingP15EntityComponentSsjjbj
 REGISTER_GAME_FUNCTION(ItemInfoManagerLoadFromMem, "_ZN15ItemInfoManager11LoadFromMemEPhb", void, void*, char*, bool);
 REGISTER_GAME_FUNCTION(OnMapLoaded, "_ZN13WorldRenderer11OnMapLoadedEv", void, void*, int64_t, int64_t, int64_t);
 REGISTER_GAME_FUNCTION(WorldRendererOnRender, "_ZN13WorldRenderer8OnRenderE7CL_Vec2IfE", void, void*, CL_Vec2f*);
+REGISTER_GAME_FUNCTION(AppInit, "_ZN3App4InitEv", void, void*);
 
 namespace game
 {
@@ -38,6 +39,9 @@ void game::EventsAPI::initialize()
     game.hookFunction<OnMapLoaded_t>(game.resolveSymbol(pattern::OnMapLoaded), OnMapLoaded, &real::OnMapLoaded);
     game.hookFunction<WorldRendererOnRender_t>(game.resolveSymbol(pattern::WorldRendererOnRender),
                                                WorldRendererOnRender, &real::WorldRendererOnRender);
+
+    game.hookFunction<AppInit_t>(game.resolveSymbol(pattern::AppInit),
+                                               AppInit, &real::AppInit);
 
     m_lastKeycode = 600000;
 }
@@ -79,6 +83,13 @@ void game::EventsAPI::WorldRendererOnRender(void* this_, CL_Vec2f* p2)
     real::WorldRendererOnRender(this_, p2);
     auto& EventsAPI = game::EventsAPI::get();
     (EventsAPI.m_sig_worldRendererOnRender)(this_, p2);
+}
+
+void game::EventsAPI::AppInit(void* this_)
+{
+    real::AppInit(this_);
+    auto& EventsAPI = game::EventsAPI::get();
+    (EventsAPI.m_sig_postInit)();
 }
 
 }; // namespace game

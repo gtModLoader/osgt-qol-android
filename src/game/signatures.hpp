@@ -66,6 +66,8 @@ DEFINE_GAME_FUNCTION(SurfaceAnimDtor, void, void*);
 DEFINE_GAME_FUNCTION(SurfaceAnimBlitScaledAnim, void, void* pAnimSurf, float x, float y, int frameX, int frameY,
                      CL_Vec2f* vScale, int alignment, unsigned int rgba, float rotation, CL_Vec2f* vRotationPt,
                      bool flipX, bool flipY, void* pBatcher, int padding);
+DEFINE_GAME_FUNCTION(SetupEntityIconFromItem, Entity*, int* ItemID, Entity* ParentEntity, CL_Vec2f* Position, int,
+                     bool bDrawBorder);
 DEFINE_GAME_FUNCTION(DrawFilledRect, void, CL_Rectf const&, uint32_t, float, CL_Vec2f*);
 DEFINE_GAME_FUNCTION(SendPacket, void, int, std::string, void*);
 DEFINE_GAME_FUNCTION(GetSavePath, std::string);

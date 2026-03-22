@@ -280,8 +280,7 @@ class Entity : public boost::signals2::trackable
 #endif
     }
 
-    uint8_t sig[24];
-    // boost::signal<void(Entity*)> sig_onRemoved;
+    boost::signals2::signal<void(Entity*)> sig_onRemoved;
 
   private:
     std::string m_name;

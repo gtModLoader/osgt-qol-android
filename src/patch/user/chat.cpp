@@ -1,5 +1,6 @@
 #include "game/game.hpp"
 #include "game/signatures.hpp"
+#include "game/struct/components/gamelogic.hpp"
 #include "game/struct/entity.hpp"
 #include "patch/patch.hpp"
 #include "utils/utils.hpp"
@@ -12,6 +13,7 @@ REGISTER_GAME_FUNCTION(TabComponentAddTabButton,
 REGISTER_GAME_FUNCTION(LogToConsoleSafe, "_Z16LogToConsoleSafeSs", void, std::string const&);
 REGISTER_GAME_FUNCTION(GetChatSettings, "_Z14GetChatSettingRSs", void, std::string const&);
 REGISTER_GAME_FUNCTION(UpdateLogTextOffset, "_Z19UpdateLogTextOffsetf", void, float);
+REGISTER_GAME_FUNCTION(AddMainMenuControls, "_Z19AddMainMenuControlsP6Entity", void, Entity*);
 class LegacyChatPatch : public patch::BasePatch
 {
   public:
@@ -127,3 +129,69 @@ REGISTER_USER_GAME_PATCH(LegacyChatPatch, enable_legacy_chat);
 bool LegacyChatPatch::m_bLoadVar = false;
 bool LegacyChatPatch::m_bUsingTabs = false;
 char* LegacyChatPatch::m_systemMsgPtr = 0;
+
+class NoGuildIconPatch : public patch::BasePatch
+{
+    void apply() const override
+    {
+        auto& game = game::GameHarness::get();
+        // Remove the guild/leaderboards icon from MainMenuControls.
+        // This patch spoofs the protocol version when there is no active event.
+        // As a result, the gem counter is back on its legacy positioning.
+        game.hookFunctionPattern(pattern::AddMainMenuControls, AddMainMenuControls, &real::AddMainMenuControls);
+    }
+
+    static void AddMainMenuControls(Entity* pEnt)
+    {
+        // nit: If the server supports toggles EventUI on the fly, then this will make it not appear
+        // until GameMenu is recreated, not a problem for OSGT though. You'd probably have to hook
+        // GameLogicComponent::OnClashEventIsActiveChanged to do anything about it.
+        // Alternate solution: Patch size2d of EVENTS entity to be 0/0 and move GemsBux when needed.
+        if (!real::GetApp()->GetGameLogic()->m_ClashEventIsActive)
+        {
+            int originalProtocol = real::GetApp()->m_serverProtocol;
+            // The check is `0x23 < GetApp()->m_serverProtocol`, so we'll just spoof to skip it.
+            real::GetApp()->m_serverProtocol = 0x23;
+            real::AddMainMenuControls(pEnt);
+            real::GetApp()->m_serverProtocol = originalProtocol;
+        }
+        else
+            real::AddMainMenuControls(pEnt);
+    }
+};
+REGISTER_USER_GAME_PATCH(NoGuildIconPatch, no_guild_icon);
+
+class ChatLimitExtended : public patch::BasePatch
+{
+    void apply() const override
+    {
+        auto& optionsMgr = game::OptionsManager::get();
+        optionsMgr.addCheckboxOption("qol", "UI", "osgt_qol_extend_console", "Extend chat history limit to 500",
+                                     &OnChatLimitCallback);
+        auto& events = game::EventsAPI::get();
+        events.m_sig_postInit.connect(&applyPostInit);
+    }
+
+    static void applyPostInit()
+    {
+        Variant* pVariant = real::GetApp()->GetVar("osgt_qol_extend_console");
+        if (pVariant->GetType() != Variant::TYPE_UINT32)
+            pVariant->Set(uint32_t(1));
+        SetConsoleLogLimit();
+    }
+
+    static void OnChatLimitCallback(VariantList* pVariant)
+    {
+        Entity* pCheckbox = pVariant->Get(1).GetEntity();
+        bool bChecked = pCheckbox->GetVar("checked")->GetUINT32() != 0;
+        real::GetApp()->GetVar("osgt_qol_extend_console")->Set(uint32_t(bChecked));
+        SetConsoleLogLimit();
+    }
+
+    static void SetConsoleLogLimit()
+    {
+        real::GetApp()->m_console.m_maxLines =
+            real::GetApp()->GetVar("osgt_qol_extend_console")->GetUINT32() == 1 ? 500 : 125;
+    }
+};
+REGISTER_USER_GAME_PATCH(ChatLimitExtended, chat_limit_extended);
