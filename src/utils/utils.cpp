@@ -66,6 +66,31 @@ void fillMemory(void* address, size_t size, uint8_t value)
     memset(address, value, size);
 }
 
-void nopInstruction(void* address) { writeMemoryPattern(address, "1F 20 03 D5"); }
+void readBackMemory(void *address, size_t size)
+{
+    uint8_t* ptr = reinterpret_cast<uint8_t*>(address);
+    std::stringstream ss;
+    for (int i = 0; i < size; i++)
+    {
+        ss << std::hex << (int)(uint8_t)*ptr << ' ';
+        ptr++;
+        if (i % 4 == 0 && i != 0)
+        {
+            LOG_DEBUG("mem: %s", ss.str().c_str());
+            ss.clear();
+            ss.str("");
+        }
+    }
+    LOG_DEBUG("mem: %s", ss.str().c_str());
+}
+
+void nopInstruction(void* address, int n) {
+    uint8_t* ptr = reinterpret_cast<uint8_t*>(address);
+    for (int i = 0; i < n; i++)
+    {
+        writeMemoryPattern(ptr + (i * 4), "1F 20 03 D5");
+    }
+
+}
 
 } // namespace utils

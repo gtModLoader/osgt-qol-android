@@ -16,6 +16,8 @@ class GameLogicComponent : public EntityComponent
         WorldRenderer* m_pWorldRenderer;
         uint8_t pad2[304];
         PlayerItems m_playerItems;
-        uint8_t pad3[632];
+        uint8_t pad3[80];
+        void* m_pTradeMenu; // 728
+        uint8_t pad4[544];
 };
 static_assert(sizeof(GameLogicComponent) == 1280, "GameLogicComponent class size mismatch.");

@@ -164,12 +164,8 @@ class Entity : public boost::signals2::trackable
         return false;
     }
 
-    /*EntityComponent* AddComponent(EntityComponent* pComp)
-    {
-        m_components.push_back(pComp);
-        pComp->OnAdd(this);
-        return pComp;
-    }*/
+    EntityComponent* AddComponent(EntityComponent* pComp);
+
     EntityComponent* GetComponentByName(std::string key)
     {
         for (const auto& comp : m_components)
@@ -180,24 +176,7 @@ class Entity : public boost::signals2::trackable
         return nullptr;
     }
 
-    /*bool RemoveComponentByName(const std::string& name)
-    {
-        std::list<EntityComponent*>::iterator itor = m_components.begin();
-
-        while (itor != m_components.end())
-        {
-            if ((*itor)->GetName() == name)
-            {
-                (*itor)->OnRemove();
-                delete (*itor);
-                itor = m_components.erase(itor);
-                return true;
-            }
-            itor++;
-        }
-
-        return false;
-    }
+    bool RemoveComponentByName(const std::string& name);
 
     bool RemoveComponentByAddress(EntityComponent* pCompToDelete, bool bDeleteAlso = true)
     {
@@ -207,7 +186,7 @@ class Entity : public boost::signals2::trackable
         {
             if (itor->get() == pCompToDelete)
             {
-                EntityComponent* pTemp = (*itor);
+                EntityComponent* pTemp = (itor->get());
                 itor = m_components.erase(itor);
                 if (bDeleteAlso)
                 {
@@ -220,7 +199,7 @@ class Entity : public boost::signals2::trackable
         }
 
         return false;
-    }*/
+    }
 
     VariantDB* GetShared() { return &m_sharedDB; }
     Variant* GetVar(const std::string& varName) { return m_sharedDB.GetVar(varName); }

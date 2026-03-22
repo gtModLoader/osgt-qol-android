@@ -7,13 +7,13 @@ class EntityComponent
 {
   public:
     EntityComponent();
-    virtual ~EntityComponent();
+    virtual ~EntityComponent() {};
 
     void SetName(std::string name) { *m_name = name; }
     std::string GetName() { return *m_name; }
 
-    virtual void OnAdd(Entity* pEnt);
-    virtual void OnRemove();
+    virtual void OnAdd(Entity* pEnt) {};
+    virtual void OnRemove() {};
 
     Entity* GetParent() { return m_parent; }
     VariantDB* GetShared() { return &m_sharedDB; }

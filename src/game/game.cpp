@@ -1,5 +1,6 @@
 #include "game.hpp"
 #include <dlfcn.h>
+#include "utils/utils.hpp"
 
 namespace game
 {
@@ -19,6 +20,11 @@ void GameHarness::initialize()
     }
 }
 
-void* GameHarness::resolveSymbol(std::string& pattern) { return dlsym(handle, pattern.c_str()); }
+void* GameHarness::resolveSymbol(std::string& pattern) {
+    void* sym = dlsym(handle, pattern.c_str());
+    if (sym == nullptr)
+        LOG_ERROR("Failed to resolve pattern %s", pattern.c_str());
+    return sym;
+}
 
 } // namespace game

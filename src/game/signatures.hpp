@@ -16,8 +16,25 @@
 // Defined in options.cpp
 DEFINE_GAME_FUNCTION(GetScreenSizeXf, float);
 DEFINE_GAME_FUNCTION(GetScreenSizeYf, float);
+DEFINE_GAME_FUNCTION(iPadMapX, float, float);
+DEFINE_GAME_FUNCTION(iPadMapY, float, float);
+DEFINE_GAME_FUNCTION(iPhoneMapX, float, float);
+DEFINE_GAME_FUNCTION(iPhoneMapY, float, float);
+DEFINE_GAME_FUNCTION(AddFocusIfNeeded, void, Entity*, bool, int);
+DEFINE_GAME_FUNCTION(TouchHandlerComponent, EntityComponent*, void*);
+DEFINE_GAME_FUNCTION(TouchHandlerArcadeComponent, EntityComponent*, void*);
+DEFINE_GAME_FUNCTION(FilterInputComponent, EntityComponent*, void*);
+DEFINE_GAME_FUNCTION(MessageManagerCallEntityFunction, void, void*, Entity*, int, std::string const&, VariantList*,
+                     int);
+DEFINE_GAME_FUNCTION(GetMessageManager, void*);
+DEFINE_GAME_FUNCTION(DisableAllButtonsEntity, void, Entity*, bool);
+DEFINE_GAME_FUNCTION(OptionsMenuCreate, void, Entity*, bool);
+DEFINE_GAME_FUNCTION(AddHotkeyToButton, void, Entity*, int);
+DEFINE_GAME_FUNCTION(SetButtonStyleEntity, void, Entity*, int);
 // Defined in signatures.cpp
 DEFINE_GAME_FUNCTION(GetApp, App*);
+DEFINE_GAME_FUNCTION(EntityAddComponent, EntityComponent*, Entity*, std::unique_ptr<EntityComponent>);
+DEFINE_GAME_FUNCTION(EntityRemoveComponentByName, bool, Entity*, std::string const&);
 DEFINE_GAME_FUNCTION(VariantDBPrint, void, VariantDB*);
 DEFINE_GAME_FUNCTION(VariantDBGetFunction, FunctionObject*, VariantDB*, std::string const& key);
 DEFINE_GAME_FUNCTION(VariantDBGetFunctionIfExists, FunctionObject*, VariantDB*, std::string const& key);
@@ -36,7 +53,6 @@ DEFINE_GAME_FUNCTION(CreateInputTextEntity, Entity*, Entity*, std::string const&
                      float, float, std::string const&, bool, std::string const&, Entity*);
 DEFINE_GAME_FUNCTION(SlideScreen, Entity*, Entity*, bool, int, int);
 DEFINE_GAME_FUNCTION(LogToConsole, void, const char*...);
-DEFINE_GAME_FUNCTION(iPhoneMapX, float, float);
 DEFINE_GAME_FUNCTION(FadeInEntity, void, Entity*, bool, int, int, float, int);
 DEFINE_GAME_FUNCTION(ResizeScrollBounds, void, VariantList*);
 DEFINE_GAME_FUNCTION(SurfaceCtor, void*, void*);

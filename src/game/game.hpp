@@ -2,6 +2,7 @@
 #include "And64InlineHook.hpp"
 #include "game/struct/graphics/background.hpp"
 #include "game/struct/variant.hpp"
+#include "utils/utils.hpp"
 #include <dlfcn.h>
 #include <link.h>
 #include <string>
@@ -49,14 +50,12 @@ class GameHarness
     // structs/classes. This should be probably reworked when an API-consumer model is created.
     void resolveSharedSigs();
 
-    // Search game memory for a specific byte pattern. Returns a pointer to the first occurrence.
-    // Throws std::invalid_argument on invalid pattern or std::runtime_error if failed to find.
-    template <typename T = void*> T findMemoryPattern(const std::string& pattern);
-
     // Detours function located at target address to function located at detour address. Optionally,
     // a pointer might be passed in order to store the original (undetoured) function address.
     // Throws std::runtime_error on failure.
     template <typename F> void hookFunction(void* target, F detour, F* original, bool hasPriority = false);
+
+    template <typename F> void hookFunctionPattern(std::string& target, F detour, F* original, bool hasPriority = false);
 
     void* resolveSymbol(std::string& pattern);
 
@@ -363,5 +362,16 @@ class EventsAPI
 
 template <typename F> void game::GameHarness::hookFunction(void* target, F detour, F* original, bool hasPriority)
 {
+    A64HookFunction(target, (void*)detour, (void**)original);
+}
+
+template <typename F> void game::GameHarness::hookFunctionPattern(std::string& pattern, F detour, F* original, bool hasPriority)
+{
+    void* target = dlsym(handle, pattern.c_str());
+    if (target == nullptr)
+    {
+        LOG_ERROR("hookFunctionPattern failed with pattern %s", pattern.c_str());
+        return;
+    }
     A64HookFunction(target, (void*)detour, (void**)original);
 }

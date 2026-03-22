@@ -5,6 +5,7 @@ set(SOURCES
     game/options.cpp
     game/signatures.cpp
     game/weathermanager.cpp
+    game/struct/entity.cpp
     game/struct/entityutils.cpp
     game/struct/miscutils.cpp
     game/struct/renderutils.cpp

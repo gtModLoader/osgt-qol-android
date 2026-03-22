@@ -3,6 +3,8 @@
 #include "game.hpp"
 
 REGISTER_GAME_FUNCTION(GetApp, "_Z6GetAppv", App*);
+REGISTER_GAME_FUNCTION(EntityAddComponent, "_ZN6Entity12AddComponentESt10unique_ptrI15EntityComponentSt14default_deleteIS1_EE", EntityComponent*, Entity*, std::unique_ptr<EntityComponent>);
+REGISTER_GAME_FUNCTION(EntityRemoveComponentByName, "_ZN6Entity21RemoveComponentByNameERKSs", bool, Entity*, std::string const&);
 REGISTER_GAME_FUNCTION(VariantDBPrint, "_ZN9VariantDB5PrintEv", void, VariantDB*);
 REGISTER_GAME_FUNCTION(VariantDBGetFunction, "_ZN9VariantDB11GetFunctionERKSs", FunctionObject*, VariantDB*,
                        std::string const& key);
@@ -59,6 +61,8 @@ namespace game
 void GameHarness::resolveSharedSigs()
 {
     RESOLVE_DIR_SYMBOL(GetApp);
+    RESOLVE_DIR_SYMBOL(EntityAddComponent);
+    RESOLVE_DIR_SYMBOL(EntityRemoveComponentByName);
     RESOLVE_DIR_SYMBOL(VariantDBPrint);
 
     RESOLVE_DIR_SYMBOL(VariantDBGetFunction);
