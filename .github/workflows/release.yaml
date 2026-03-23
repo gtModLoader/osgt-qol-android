@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[vV]*"
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yaml
+
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libosgtqol
+          path: staging
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: staging/libosgtqol.so
+          generate_release_notes: true
+          # Create a draft so we can replace the changelogs manually prior to publishing
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

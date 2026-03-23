@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'LICENSE'
+      - 'README.md'
+      - 'mod-assets/**'
+      - '.clangd'
+      - '.clang-format'
+      - '.gitignore'
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Workaround for ubuntu 24.04, the library is backwards compatible
+      - name: Fix libtinfo symlink
+        run: |
+          sudo ln -s /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.5
+
+      - name: Setup Android NDK 17c
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r17c
+
+      # We have to lie about CXX and C compiler works because of some modern linux/legacy NDK bug
+      - name: Build with CMake Preset
+        run: |
+          cmake --preset "android-arm64 Release" -DCMAKE_CXX_COMPILER_WORKS=ON -DCMAKE_C_COMPILER_WORKS=ON
+          cmake --build --preset "build-release"
+        env:
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+          CMAKE_GENERATOR: Ninja
+
+      - name: Upload Native Libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: libosgtqol
+          path: "build/arm64-rel/src/libosgtqol.so"

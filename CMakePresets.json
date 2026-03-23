@@ -28,5 +28,15 @@
         "DEVELOPMENT_BUILD": "ON"
       }
     }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-release",
+      "configurePreset": "android-arm64 Release"
+    },
+    {
+      "name": "build-debug",
+      "configurePreset": "android-arm64 Debug"
+    }
   ]
 }
