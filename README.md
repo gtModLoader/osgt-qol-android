@@ -8,7 +8,7 @@
 OSGT-QOL-ANDROID is a quality of life mod for Growtopia 4.03 ARM64 Android clients aimed at Oldschool Growtopia players,, ported from the [original PC mod for V3.02 Windows clients](https://github.com/gtModLoader/osgt-qol). It features various quality of life and security changes along extending several limitations of the vanilla game client.
 
 > [!NOTE]
-> The game modification is provided as a working prototype and requires heavy techincal knowledge to install at the moment.
+> The game modification is provided as a working prototype. This is on a far more shaky foundation compared to the PC mod, volatility is expected.
 
 ## Table of Contents
 - [Building](#building)
@@ -21,7 +21,7 @@ You must use **Android NDK r17c** with GNU STL to build the shared library and s
 Once you have built the shared library, you will need to source a Growtopia V4.03 ARM64 Android client (build ID 294 on Google Play servers), unpack the app and its classes.dex and add your library to Main.smali (see [mod-assets/smali-patch.sh](mod-assets/smali-patch.sh)). Once you've done smali patching, you'll need to drop libosgtqol.so to your `lib/arm64-v8a/` folder, repack the app and sign it with your keys (can also be debug keys).
 
 ## Installing
-There is no simple installation process right now, you will need technical skills to patch your app right now as the apk cannot be redistributed officially. See [Building](#Building) section for more information.
+Obtain a Growtopia V4.03 ARM64 apk file from a mirror site or the Internet Archive, go to the Releases tab and download libosgtqol.so. Once you have both, you can either use [GrowSlopPatcher](https://github.com/cernodile/GrowSlopPatcher/releases) or install it manually by following the [Building](#building) guide.
 
 ## What does this mod change?
 Core Patches (always enabled):
