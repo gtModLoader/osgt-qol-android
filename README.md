@@ -56,7 +56,7 @@ User-facing patches that don't really impact your gameplay or are made for exper
 ## What won't be coming from PC version
 - CRC Integrity Check bypass - Not needed for V4.03 Android
 - No DACL Modifications - Not applicalbe for Android
-- Save & Log Location Fixer - Not applicable for Android due to security frameworks present, rather have separate package namespaces once that's figured out
+- Save & Log Location Fixer - Not applicable for Android due to security frameworks present
 - Live GUI Rebuilder - There is no GUI rebuilding in Android
 - Music mute fix - It seems to be fixed in vanilla game(?)
 - Dialog Walking - Not really practical on touchscreen unless you have a tablet & keyboard
