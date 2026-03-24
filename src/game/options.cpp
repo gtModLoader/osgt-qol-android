@@ -66,6 +66,8 @@ REGISTER_GAME_FUNCTION(OptionsMenuCreate, "_Z17OptionsMenuCreateP6Entityb", void
 REGISTER_GAME_FUNCTION(AddHotkeyToButton, "_Z17AddHotKeyToButtonP6Entityj", void, Entity*, int);
 REGISTER_GAME_FUNCTION(SetButtonStyleEntity, "_Z20SetButtonStyleEntityP6EntityN17Button2DComponent12eButtonStyleE",
                        void, Entity*, int);
+REGISTER_GAME_FUNCTION(AppCalculateLeftUIsOffsetValue, "_ZN3App27CalcualteLeftUIsOffsetValueEv", float, App*);
+REGISTER_GAME_FUNCTION(AppCalculateRightUIsOffsetValue, "_ZN3App28CalcualteRightUIsOffsetValueEv", float, App*);
 struct ScrollSettings
 {
     CL_Vec2f position = {0, 0};
@@ -118,6 +120,8 @@ void game::OptionsManager::initialize()
     RESOLVE_SYMBOL(GetMessageManager);
     RESOLVE_SYMBOL(MessageManagerCallEntityFunction);
     RESOLVE_SYMBOL(SetButtonStyleEntity);
+    RESOLVE_SYMBOL(AppCalculateLeftUIsOffsetValue);
+    RESOLVE_SYMBOL(AppCalculateRightUIsOffsetValue);
 
     // Hook
     game.hookFunction<OptionsMenuAddContent_t>(game.resolveSymbol(pattern::OptionsMenuAddContent),
@@ -394,6 +398,9 @@ void OptionsManager::HandleOptionPageButton(VariantList* pVL)
 
     OptionsManager::OptionsPage& page = optionsMgr.optionPages[pClickedEnt->GetName()];
     float vPosX = real::iPhoneMapX(5.0);
+#ifdef ANDROID
+    vPosX += real::AppCalculateLeftUIsOffsetValue(real::GetApp());
+#endif
     float vPosY = 0;
 
     uint32_t fontID;
@@ -444,9 +451,12 @@ void OptionsManager::HandleOptionPageButton(VariantList* pVL)
 
     // and blit a Back button.
     real::GetFontAndScaleToFitThisLinesPerScreenY(fontID, fontScale, 13);
-    Entity* pBackButton =
-        real::CreateTextButtonEntity(pOverEnt, "Back", real::iPhoneMapX(25.0),
-                                     screenRect.bottom - real::iPhoneMapY(40.0), "Back", false, 0, "", 0, "", 1, 0);
+    float buttonX = real::iPhoneMapX(25.0);
+#ifdef ANDROID
+    buttonX += real::AppCalculateLeftUIsOffsetValue(real::GetApp());
+#endif
+    Entity* pBackButton = real::CreateTextButtonEntity(
+        pOverEnt, "Back", buttonX, screenRect.bottom - real::iPhoneMapY(40.0), "Back", false, 0, "", 0, "", 1, 0);
     pBackButton->GetFunction("OnButtonSelected")->sig_function.connect(&OptionPageOnSelect);
     real::SetupTextEntity(pBackButton, fontID, fontScale);
     real::AddBMPRectAroundEntity(pBackButton, 0xccb887ff, 0xccb887ff, real::iPadMapY(20.0), true, fontScale, fontID,
@@ -497,6 +507,9 @@ void OptionsManager::OptionsMenuAddContent(void* pEnt, void* unk2, void* unk3, v
     vPosY += pLastEntity->GetVar("pos2d")->GetVector2().y;
     vPosY += pLastEntity->GetVar("size2d")->GetVector2().y;
     float vPosX = real::iPhoneMapX(5.0);
+#ifdef ANDROID
+    vPosX += real::AppCalculateLeftUIsOffsetValue(real::GetApp());
+#endif
 
     // Create scaling for our label
     uint32_t fontID;

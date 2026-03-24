@@ -1374,7 +1374,6 @@ class Buildomatica : public patch::BasePatch
 
     static void loadFromMemCallback()
     {
-        LOG_DEBUG("sup");
         Variant* pVariant = real::GetApp()->GetVar("osgt_qol_buildomatica_toggle");
         if (pVariant->GetType() == Variant::TYPE_UNUSED)
             pVariant->Set(1U);

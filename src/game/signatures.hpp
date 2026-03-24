@@ -31,6 +31,8 @@ DEFINE_GAME_FUNCTION(DisableAllButtonsEntity, void, Entity*, bool);
 DEFINE_GAME_FUNCTION(OptionsMenuCreate, void, Entity*, bool);
 DEFINE_GAME_FUNCTION(AddHotkeyToButton, void, Entity*, int);
 DEFINE_GAME_FUNCTION(SetButtonStyleEntity, void, Entity*, int);
+DEFINE_GAME_FUNCTION(AppCalculateLeftUIsOffsetValue, float, App*);
+DEFINE_GAME_FUNCTION(AppCalculateRightUIsOffsetValue, float, App*);
 // Defined in signatures.cpp
 DEFINE_GAME_FUNCTION(GetApp, App*);
 DEFINE_GAME_FUNCTION(EntityAddComponent, EntityComponent*, Entity*, std::unique_ptr<EntityComponent>);
