@@ -40,6 +40,15 @@ add_library(${PROJECT_NAME} SHARED
     ${SOURCES_CORE_PATCHES}
     ${SOURCES_USER_PATCHES}
 )
+
+# Only strip in Release builds
+if(NOT DEVELOPMENT_BUILD STREQUAL "ON")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_STRIP} --strip-unneeded $<TARGET_FILE:${PROJECT_NAME}>
+        COMMENT "Stripped symbols"
+    )
+endif()
+
 # Find Android log library
 find_library(
     log-lib
