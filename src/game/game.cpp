@@ -11,13 +11,14 @@ GameHarness& GameHarness::get()
     return instance;
 }
 
-void GameHarness::initialize()
+void GameHarness::initialize(JavaVM* vm)
 {
     handle = dlopen("libgrowtopia.so", RTLD_NOW | RTLD_NOLOAD);
     if (!handle)
     {
         handle = dlopen("libgrowtopia.so", RTLD_NOW);
     }
+    jVM = vm;
 }
 
 void* GameHarness::resolveSymbol(std::string& pattern) {

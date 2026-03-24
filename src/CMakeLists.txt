@@ -9,6 +9,7 @@ set(SOURCES
     game/struct/entityutils.cpp
     game/struct/miscutils.cpp
     game/struct/renderutils.cpp
+    game/struct/resourceutils.cpp
     game/struct/variant.cpp
     game/struct/variantdb.cpp
     game/struct/graphics/background.cpp
@@ -30,6 +31,7 @@ set(SOURCES_USER_PATCHES
 
 set(SOURCES_CORE_PATCHES
     patch/core/about.cpp
+    patch/core/cache.cpp
     patch/core/integrity.cpp
     patch/core/version.cpp
 )

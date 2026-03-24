@@ -8,7 +8,7 @@
 
 REGISTER_GAME_FUNCTION(FocusInputComponentOnInput, "_ZN19FocusInputComponent7OnInputEP11VariantList", void, void*,
                        void*);
-void setup()
+void setup(JavaVM* vm)
 {
     LOG_DEBUG("Launching OSGT-QOL-ANDROID " OSGT_QOL_DISPLAY_VERSION);
 
@@ -20,7 +20,7 @@ void setup()
     auto& weatherMgr = game::WeatherManager::get();
     auto& events = game::EventsAPI::get();
 
-    game.initialize();
+    game.initialize(vm);
     game.resolveSharedSigs();
 
     // Do what we do on PC and kill one of the LogMsg spammers.
@@ -39,6 +39,6 @@ void setup()
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved)
 {
-    setup();
+    setup(vm);
     return JNI_VERSION_1_6;
 }

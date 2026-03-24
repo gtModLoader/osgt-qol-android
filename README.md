@@ -28,6 +28,7 @@ Core Patches (always enabled):
 - About Menu attribution - Adds credits for the modification & lists all the loaded in user patches
 - Secure Item Manager - Scans to-be-downloaded files for path traversal attempts, stopping & warning the user on detection, while this protection is less meaningful on mobile, it is useful to know what some servers owners are up to.
 - Secure Battle Event - Fixes a Remote Code Execution vulnerability in Battle Event processing logic and adds a few sanitizations for BattleStatus serialization. This can otherwise be used to mess with game's internal state.
+- Cache Location Fixer - Allows you to clone the app to a different package (multi-install) after you've done smali patches.
 
 User-facing, most notable/impactful patches:
 - Framerate Unlock patch - Adjusts the game's framerate limit to match the users display refresh rate. Additionally fixes some visuals caused by higher FPS
@@ -56,7 +57,6 @@ User-facing patches that don't really impact your gameplay or are made for exper
 - CRC Integrity Check bypass - Not needed for V4.03 Android
 - No DACL Modifications - Not applicalbe for Android
 - Save & Log Location Fixer - Not applicable for Android due to security frameworks present, rather have separate package namespaces once that's figured out
-- Cache Location Fixer - Not applicable for same reason as Save & Log
 - Live GUI Rebuilder - There is no GUI rebuilding in Android
 - Music mute fix - It seems to be fixed in vanilla game(?)
 - Dialog Walking - Not really practical on touchscreen unless you have a tablet & keyboard

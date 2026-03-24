@@ -4,6 +4,7 @@
 #include "game/struct/variant.hpp"
 #include "utils/utils.hpp"
 #include <dlfcn.h>
+#include <jni.h>
 #include <link.h>
 #include <string>
 
@@ -44,7 +45,7 @@ class GameHarness
     // Initialization function. This cannot be performed at construct-time due to the fact the game
     // itself is not fully initialized at that point (the constructor may be called during static
     // initialization of other objects).
-    void initialize();
+    void initialize(JavaVM* vm);
 
     // Temporarily used to store various function signature resolves that are used in
     // structs/classes. This should be probably reworked when an API-consumer model is created.
@@ -64,11 +65,15 @@ class GameHarness
 
     void* getGameHandle() const { return handle; };
 
+    JavaVM* getJavaVM() const { return jVM; };
+
     GameHarness(GameHarness const&) = delete;
     void operator=(GameHarness const&) = delete;
 
   private:
     void* handle;
+
+    JavaVM* jVM;
 
     GameHarness() = default;
 };
