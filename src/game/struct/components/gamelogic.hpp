@@ -1,6 +1,7 @@
 #pragma once
 #include "game/struct/component.hpp"
 #include "game/struct/playeritems.hpp"
+#include "game/struct/textmanager.hpp"
 #include "game/struct/world/world.hpp"
 #include "game/struct/world/worldrenderer.hpp"
 
@@ -14,12 +15,14 @@ class GameLogicComponent : public EntityComponent
         uint8_t pad[70];
         World* m_pWorld;
         WorldRenderer* m_pWorldRenderer;
-        uint8_t pad2[304];
+        uint8_t pad2[192];
+        TextManager m_textManager;
+        uint8_t pad3[64];
         PlayerItems m_playerItems;
-        uint8_t pad3[80];
+        uint8_t pad4[80];
         void* m_pTradeMenu; // 728
-        uint8_t pad4[132];
+        uint8_t pad5[132];
         bool m_ClashEventIsActive;
-        uint8_t pad5[411];
+        uint8_t pad6[411];
 };
 static_assert(sizeof(GameLogicComponent) == 1280, "GameLogicComponent class size mismatch.");

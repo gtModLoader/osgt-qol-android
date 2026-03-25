@@ -7,6 +7,7 @@
 #include "game/struct/graphics/background_blood.hpp"
 #include "game/struct/graphics/background_default.hpp"
 #include "game/struct/miscutils.hpp"
+#include "game/struct/netavatar/netavatar.hpp"
 #include "game/struct/renderutils.hpp"
 #include "game/struct/rtrect.hpp"
 #include "game/struct/world/world.hpp"
@@ -75,6 +76,12 @@ REGISTER_GAME_FUNCTION(WorldTileMapChooseVisual_SmartEdge,
 REGISTER_GAME_FUNCTION(DrawTile, "_ZN13WorldRenderer8DrawTileEti7CL_Vec2IfEjP4Tilebb", void, WorldRenderer* param_1,
                        unsigned short param_2, int param_3, CL_Vec2f* param_4, unsigned int param_5, Tile* param_6,
                        uint8_t param_7, char param_8);
+REGISTER_GAME_FUNCTION(TextManagerAddTextByTile,
+                       "_ZN11TextManager13AddTextByTileEP4TileRKSsbbN8TextItem13eTimingMethodEb", TextObject*, void*,
+                       Tile* pTile, std::string msg, bool bPushToFront, bool bOnlyAddIfTileBlank, int timing,
+                       bool bIsBillboard);
+REGISTER_GAME_FUNCTION(NetAvatarProcessTileWeAreDirectlyOver, "_ZN9NetAvatar28ProcessTileWeAreDirectlyOverEv", void,
+                       void*);
 REGISTER_GAME_GLOBAL_VAR(g_fireBatcher, "g_fireBatcher", void*);
 static std::vector<std::string> displayNames;
 static uint32_t vanillaWeatherBound = 16;
@@ -1351,9 +1358,13 @@ class Buildomatica : public patch::BasePatch
                                                                        &real::WorldTileMapChooseVisual_SmartEdge);
         game.hookFunctionPattern<WorldTileMapGetTileSafe_t>(pattern::WorldTileMapGetTileSafe, WorldTileMapGetTileSafe,
                                                             &real::WorldTileMapGetTileSafe);
+        game.hookFunctionPattern<NetAvatarProcessTileWeAreDirectlyOver_t>(
+            pattern::NetAvatarProcessTileWeAreDirectlyOver, NetAvatarProcessTileWeAreDirectlyOver,
+            &real::NetAvatarProcessTileWeAreDirectlyOver);
         RESOLVE_SYMBOL(WorldTileMapChooseVisual);
         RESOLVE_SYMBOL(WorldTileMapChooseVisual_Flag);
         RESOLVE_SYMBOL(DrawTile);
+        RESOLVE_SYMBOL(TextManagerAddTextByTile);
         real::g_fireBatcher = (void*)dlsym(game.getGameHandle(), pattern::g_fireBatcher.c_str());
 
         // We will reset our fake tilemap on map load
@@ -1604,6 +1615,45 @@ class Buildomatica : public patch::BasePatch
         // Used in various places in DrawTile and WorldRenderer/Tilemap subfunctions such as
         // PickVisualOnTheFly which determines spike locations.
         return real::WorldTileMapGetTileSafe(m_bDrawingHologram ? &m_fakeTilemap : pTilemap, x, y);
+    }
+
+    // Rendering
+    static void NetAvatarProcessTileWeAreDirectlyOver(void* this_)
+    {
+        // We'll draw any relevant tile data info as textobjects.
+        real::NetAvatarProcessTileWeAreDirectlyOver(this_);
+
+        // Likely no fake tilemap set up yet.
+        if (m_cameraTiles.size() == 0)
+            return;
+
+        Rectf colRect = ((NetMoving*)this_)->GetCollisionRectWorld();
+
+        // Get centered position
+        int x = (int)((colRect.left + (colRect.right - colRect.left) * 0.5f) * 0.03125f);
+        int y = (int)((colRect.top + (colRect.bottom - colRect.top) * 0.5f) * 0.03125f);
+
+        Tile* pTile = real::WorldTileMapGetTileSafe(&m_fakeTilemap, x, y);
+        if (pTile != nullptr)
+        {
+            ItemInfo* pInfo = real::GetApp()->GetItemInfoManager()->GetItemByIDSafe(pTile->m_itemID);
+            if (pInfo->m_type == 99)
+            {
+                // TYPE_SUPERMUSIC
+                int idx = pTile->x + (pTile->y * m_fakeTilemap.m_sizeX);
+                if (m_gmsfRackLabels.find(idx) != m_gmsfRackLabels.end())
+                {
+                    // TODO: Compare and highlight. Needs TileExtra stuff.
+                    TextObject* pObj = real::TextManagerAddTextByTile(
+                        &real::GetApp()->GetGameLogic()->m_textManager, pTile,
+                        m_gmsfRackLabels[idx].pattern + "\nVolume: " + toString(m_gmsfRackLabels[idx].Volume), true,
+                        false, 1, false);
+                    // Use same color as providers.
+                    pObj->m_color = 0x404040ff;
+                    pObj->m_colorBG = 0x969696ff;
+                }
+            }
+        }
     }
 
     static void WorldRendererDrawBackgroundTiles(WorldRenderer* this_, std::vector<Tile*>* tiles)
@@ -2150,9 +2200,48 @@ class Buildomatica : public patch::BasePatch
         return 0;
     }
 
+    static std::string GMSFNoteToString(int ID, int position)
+    {
+        if (ID == 0)
+            return "";
+        std::string res;
+        // Get the note key based off its position. Char 66 corresponds to capital 'B'. 65 corresponds to 'A'. Once we
+        // get to 64, we're back on symbols table, so we can add 7 back to the char count and start decrementing down
+        // from 'G' to 'C'.
+        char noteKeyBase = 66 - (position % 7);
+        if (noteKeyBase <= 64)
+            noteKeyBase += 7;
+        // We'll shift everything up by 0x20 on the ASCII table to get lowercase letters for second octave.
+        if (position >= 7)
+            noteKeyBase += 32;
+        std::string noteKey;
+        noteKey += noteKeyBase;
+        if (ID >= 1 && ID <= 3)
+            res = "P" + noteKey + (ID == 1 ? "-" : ID == 3 ? "b" : "#");
+        else if (ID >= 4 && ID <= 6)
+            res = "B" + noteKey + (ID == 4 ? "-" : ID == 6 ? "b" : "#");
+        else if (ID == 7)
+            res = "D" + noteKey + "-";
+        else if (ID >= 9 && ID <= 11)
+            res = "S" + noteKey + (ID == 9 ? "-" : ID == 11 ? "b" : "#");
+        else if (ID >= 16 && ID <= 18)
+            res = "F" + noteKey + (ID == 16 ? "-" : ID == 18 ? "b" : "#");
+        else if (ID >= 20 && ID <= 22)
+            res = "G" + noteKey + (ID == 20 ? "-" : ID == 22 ? "b" : "#");
+        else if (ID >= 23 && ID <= 25)
+            res = "V" + noteKey + (ID == 23 ? "-" : ID == 25 ? "b" : "#");
+        else if (ID >= 26 && ID <= 28)
+            res = "L" + noteKey + (ID == 26 ? "-" : ID == 28 ? "b" : "#");
+        else if (ID >= 29 && ID <= 31)
+            res = "E" + noteKey + (ID == 29 ? "-" : ID == 31 ? "b" : "#");
+        else if (ID >= 32 && ID <= 34)
+            res = "T" + noteKey + (ID == 32 ? "-" : ID == 34 ? "b" : "#");
+        return res;
+    }
+
     static int LoadFromGMSF(std::string Path)
     {
-        std::ifstream world(Path, std::ios_base::binary);
+        std::ifstream world(real::GetSavePath() + Path, std::ios_base::binary);
         if (!world)
             return 1;
         world.seekg(0, std::ios_base::end);
@@ -2214,16 +2303,32 @@ class Buildomatica : public patch::BasePatch
                     &m_fakeTilemap.m_tiles[(i % m_fakeTilemap.m_sizeX) + ((baseY + y) * m_fakeTilemap.m_sizeX)];
                 if (noteID == 15)
                 {
-                    // Audio Rack, skip parsing it, since we don't playback or show its data.
-                    // Otherwise the format is: fixed array of 5 - first byte notetype, second byte
-                    // playing position
-                    // Final byte after the note array is volume.
+                    // Audio Rack
+                    std::string pattern;
+                    bool bAddedLast = false;
+                    for (int j = 0; j < 5; j++)
+                    {
+                        int type = *((int8_t*)(pMem + ptr++));
+                        int position = *((int8_t*)(pMem + ptr++));
+                        std::string note = GMSFNoteToString(type, position);
+                        if (note.size() > 0)
+                        {
+                            if (bAddedLast)
+                                pattern += " ";
+                            pattern += note;
+                            bAddedLast = true;
+                        }
+                        else
+                            bAddedLast = false;
+                    }
                     pTarget->m_itemID = 4632;
-                    ptr += 11;
+                    int volume = *((int8_t*)(pMem + ptr++));
+                    AudioRackInfo audioObj{pattern, volume};
+                    m_gmsfRackLabels[(i % m_fakeTilemap.m_sizeX) + ((baseY + y) * m_fakeTilemap.m_sizeX)] = audioObj;
                 }
                 else
                 {
-                    if (noteID >= 0 && noteID <= 33)
+                    if (noteID > 0 && noteID <= 33)
                         pTarget->m_itemBGID = gmsfNoteIDs[noteID];
                 }
             }
@@ -2232,8 +2337,14 @@ class Buildomatica : public patch::BasePatch
     }
 
   private:
+    struct AudioRackInfo
+    {
+        std::string pattern;
+        int Volume;
+    };
     static WorldTileMap m_fakeTilemap;
     static std::vector<Tile*> m_cameraTiles;
+    static std::map<int, AudioRackInfo> m_gmsfRackLabels;
     static bool m_bModEnabled;
     static bool m_bDrawingHologram;
     static bool m_bDrawNotesOnly;
@@ -2257,6 +2368,7 @@ class Buildomatica : public patch::BasePatch
 };
 WorldTileMap Buildomatica::m_fakeTilemap = WorldTileMap();
 std::vector<Tile*> Buildomatica::m_cameraTiles = std::vector<Tile*>();
+std::map<int, Buildomatica::AudioRackInfo> Buildomatica::m_gmsfRackLabels;
 bool Buildomatica::m_bModEnabled = true;
 bool Buildomatica::m_bDrawingHologram = false;
 bool Buildomatica::m_bDrawNotesOnly = false;
