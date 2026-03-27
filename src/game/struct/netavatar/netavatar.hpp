@@ -1,6 +1,7 @@
 #pragma once
 #include "game/struct/component.hpp"
 #include "game/struct/vec.hpp"
+#include "game/struct/lockfloat.hpp"
 
 // Namings matched.
 class NetBase
@@ -64,4 +65,8 @@ class NetAvatar : public NetMoving
 {
   public:
     virtual ~NetAvatar(){};
+    uint8_t pad[68];
+    unsigned int m_flags;
+    uint8_t pad2[108];
+    bool m_bDoubleJumpAvailable;
 };

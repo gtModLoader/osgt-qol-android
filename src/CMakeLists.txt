@@ -24,6 +24,7 @@ set(SOURCES
 set(SOURCES_USER_PATCHES
     patch/user/chat.cpp
     patch/user/framerate.cpp
+    patch/user/misc.cpp
     patch/user/net.cpp
     patch/user/render.cpp
     patch/user/playmodoverlay.cpp
