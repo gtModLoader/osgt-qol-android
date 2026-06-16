@@ -1,11 +1,12 @@
 #pragma once
+#include "boost/signals2/trackable.hpp"
 #include "game/struct/vec.hpp"
 #include <string>
 
 // We try replicate the classes here, but we really are going to just pass it on to game's actual
 // ctor.
 class SoftSurface;
-class Surface
+class Surface : public boost::signals2::trackable
 {
   public:
     enum eTextureType
@@ -32,8 +33,6 @@ class Surface
     Surface();
     virtual ~Surface() {};
     //void* vftable;
-    void* sig_pad1;
-    void* sig_pad2;
     // uint8_t trackSignal[24];
 
     bool LoadFile(std::string fName, bool bAddBasePath = true);
