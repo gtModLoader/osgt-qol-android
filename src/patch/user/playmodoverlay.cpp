@@ -88,6 +88,10 @@ class PlaymodTimersOverlay : public patch::BasePatch
         // Used for constructing the overlay after we got signal that the map is loaded.
         events.m_sig_onMapLoaded.connect(&PlaymodTimersOverlay::OnMapLoaded);
 
+        auto& optionsMgr = game::OptionsManager::get();
+        optionsMgr.addCheckboxOption("qol", "UI", "osgt_qol_hide_playmod_overlay", "Hide playmod overlay\n",
+                                     &OnOverlayHideCallback);
+
         // TODO: Clear UI on server exit.
     }
 
@@ -119,9 +123,6 @@ class PlaymodTimersOverlay : public patch::BasePatch
 
         // In-game way of toggling overlay visibility
         g_IsOverlayHidden = real::GetApp()->GetVar("osgt_qol_hide_playmod_overlay")->GetUINT32() != 0;
-        auto& optionsMgr = game::OptionsManager::get();
-        optionsMgr.addCheckboxOption("qol", "UI", "osgt_qol_hide_playmod_overlay", "Hide playmod overlay\n",
-                                     &OnOverlayHideCallback);
     }
 
     static void OnLogGrabBarChanged(Variant* pV)
