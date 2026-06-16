@@ -9,7 +9,7 @@ REGISTER_GAME_FUNCTION(GetArcadeComponent, "_Z18GetArcadeComponentv", EntityComp
 REGISTER_GAME_FUNCTION(AddKeyBinding, "_Z13AddKeyBindingP15EntityComponentSsjjbj", void, EntityComponent* pComp,
                        std::string name, uint32_t inputcode, uint32_t outputcode, bool bAlsoSendAsNormalRawKey,
                        uint32_t modifiersRequired);
-REGISTER_GAME_FUNCTION(ItemInfoManagerLoadFromMem, "_ZN15ItemInfoManager11LoadFromMemEPhb", void, void*, char*, bool);
+REGISTER_GAME_FUNCTION(ItemInfoManagerLoadFromMem, "_ZN15ItemInfoManager11LoadFromMemEPhb", bool, void*, char*, bool);
 REGISTER_GAME_FUNCTION(OnMapLoaded, "_ZN13WorldRenderer11OnMapLoadedEv", void, void*, int64_t, int64_t, int64_t);
 REGISTER_GAME_FUNCTION(WorldRendererOnRender, "_ZN13WorldRenderer8OnRenderE7CL_Vec2IfE", void, void*, CL_Vec2f*);
 REGISTER_GAME_FUNCTION(AppInit, "_ZN3App4InitEv", void, void*);
@@ -48,11 +48,12 @@ void game::EventsAPI::initialize()
 
 int game::EventsAPI::acquireKeycode() { return m_lastKeycode++; }
 
-void game::EventsAPI::ItemInfoManagerLoadFromMem(void* this_, char* pBytes, bool arg3)
+bool game::EventsAPI::ItemInfoManagerLoadFromMem(void* this_, char* pMem, bool bIsClientVersion)
 {
-    real::ItemInfoManagerLoadFromMem(this_, pBytes, arg3);
+    bool ret = real::ItemInfoManagerLoadFromMem(this_, pMem, bIsClientVersion);
     auto& EventsAPI = game::EventsAPI::get();
     (EventsAPI.m_sig_loadFromMem)();
+    return ret;
 }
 void game::EventsAPI::OnArcadeInput(VariantList* pVL)
 {

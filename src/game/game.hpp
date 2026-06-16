@@ -350,7 +350,7 @@ class EventsAPI
     int acquireKeycode();
 
   private:
-    static void ItemInfoManagerLoadFromMem(void* this_, char* pBytes, bool arg3);
+    static bool ItemInfoManagerLoadFromMem(void* this_, char* pMem, bool bIsClientVersion);
     static void OnArcadeInput(VariantList* pVL);
     static void NetControllerLocalOnArcadeInput(void* this_, int keyCode, bool bKeyFired);
     static void AddWASDKeys();
