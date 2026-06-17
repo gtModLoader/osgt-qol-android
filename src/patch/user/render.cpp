@@ -1325,7 +1325,9 @@ class HotbarExpanded : public patch::BasePatch
 short HotbarExpanded::m_extendedSlots[6] = {0, 0, 0, 0, 0, 0};
 short HotbarExpanded::m_extraSlots = 0;
 std::vector<std::string> HotbarExpanded::m_optionNames;
-REGISTER_USER_GAME_PATCH(HotbarExpanded, hotbar_expanded);
+// REGISTER_USER_GAME_PATCH(HotbarExpanded, hotbar_expanded);
+// Will return once 12-byte functions patching is more stable, there's some OEM specific stuff that it still doesn't
+// like.
 
 static int gmsfNoteIDs[34] = {0,    420,  422,  424,  414,   416,   418,   426,   412,   4634, 4636, 4638,
                               4640, 4642, 4192, 5726, 5728,  5730,  5370,  6030,  6032,  6034, 6808, 6810,

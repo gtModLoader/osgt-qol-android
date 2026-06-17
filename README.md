@@ -34,7 +34,6 @@ User-facing, most notable/impactful patches:
 - Framerate Unlock patch - Adjusts the game's framerate limit to match the users display refresh rate. Additionally fixes some visuals caused by higher FPS
 - Server Switcher - You can now connect to any server that supports V4.03 and supplies a valid SSL certificate without modifying hosts file with this mod
 - Status Effects Overlay - Showcases active status effects with timers on your character just below the chat
-- Resizeable Hotbar - Allows you to resize the quick tools hotbar to be up to 10 slots instead of the vanilla 4
 - Buildomatica - Allows you to overlay World Planner files in-game as schematics you can follow. To use, create a folder called "schematics" in your game folder and drop your .GMSF, .gtworld and/or .GMSF files there (may require ADB or root privileges on Android 11+ and newer phones).
 - Double Jump State Fixer - Fixes annoying design decision where if any state change happened on your player (e.g. got Stinky mod) would nullify your currently available double jump.
 - Skip Store Confirm - Skips the "Please wait..." screen when buying packs if enabled, this is a must-have if you are buying in bulk and have high ping to the server as it negates the ping advantage lower ping players have.
