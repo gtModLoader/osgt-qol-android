@@ -878,9 +878,11 @@ class HotbarExpanded : public patch::BasePatch
             &real::PlayerItemsUpdateQuickSlotsWithUsedItem);
         game.hookFunctionPattern<PlayerItemsSetQuickSlotItem_t>(
             pattern::PlayerItemsSetQuickSlotItem, PlayerItemsSetQuickSlotItem, &real::PlayerItemsSetQuickSlotItem);
-        game.hookFunctionPattern<GameLogicComponentGetQuickToolInSlot_t>(pattern::GameLogicComponentGetQuickToolInSlot,
-                                                                         GameLogicComponentGetQuickToolInSlot,
-                                                                         &real::GameLogicComponentGetQuickToolInSlot);
+        // GameLogicComponent::GetQuickToolInSlot is a 12-byte function. And64InlineHook will attempt to install 16-byte
+        // trampoline on some devices and cause crashes, so we'll force it to use our 4-byte trampoline instead.
+        game.hookFunctionPattern<GameLogicComponentGetQuickToolInSlot_t>(
+            pattern::GameLogicComponentGetQuickToolInSlot, GameLogicComponentGetQuickToolInSlot,
+            &real::GameLogicComponentGetQuickToolInSlot, true);
         game.hookFunctionPattern<UpdateTouchControlPositions_t>(
             pattern::UpdateTouchControlPositions, UpdateTouchControlPositions, &real::UpdateTouchControlPositions);
         game.hookFunctionPattern<InventoryMenuCreate_t>(pattern::InventoryMenuCreate, InventoryMenuCreate,
@@ -1071,7 +1073,7 @@ class HotbarExpanded : public patch::BasePatch
     static int GameLogicComponentGetQuickToolInSlot(GameLogicComponent* pGameLogic, int slot)
     {
         if (slot < 4)
-            return real::GameLogicComponentGetQuickToolInSlot(pGameLogic, slot);
+            return (int)pGameLogic->m_playerItems.m_quickSlots[slot];
         else if (slot < (4 + m_extraSlots))
             return m_extendedSlots[slot - 4];
         return 0;

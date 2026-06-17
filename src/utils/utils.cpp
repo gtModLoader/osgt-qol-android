@@ -66,7 +66,7 @@ void fillMemory(void* address, size_t size, uint8_t value)
     memset(address, value, size);
 }
 
-void readBackMemory(void *address, size_t size)
+void readBackMemory(void* address, size_t size)
 {
     uint8_t* ptr = reinterpret_cast<uint8_t*>(address);
     std::stringstream ss;
@@ -84,13 +84,34 @@ void readBackMemory(void *address, size_t size)
     LOG_DEBUG("mem: %s", ss.str().c_str());
 }
 
-void nopInstruction(void* address, int n) {
+void installLossyJumpHook(void* target_func, void* hook_func)
+{
+    // Calculate page alignment for mprotect
+    uintptr_t page_start = (uintptr_t)target_func & ~(PAGE_SIZE - 1);
+    mprotect((void*)page_start, PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
+
+    // Calculate the PC-relative offset
+    int64_t offset = (int64_t)hook_func - (int64_t)target_func;
+
+    // ARM64 B instruction encoding: 0x14000000 | (offset >> 2)
+    // Note: The offset must be within +/- 128MB, not a problem for Growtopia, since the library itself is not that
+    // large.
+    uint32_t b_opcode = 0x14000000 | ((offset >> 2) & 0x03FFFFFF);
+
+    // Overwrite the very first instruction of the target function
+    *(volatile uint32_t*)target_func = b_opcode;
+
+    // Clear instruction cache so the CPU sees the change
+    __builtin___clear_cache((char*)target_func, (char*)target_func + 4);
+}
+
+void nopInstruction(void* address, int n)
+{
     uint8_t* ptr = reinterpret_cast<uint8_t*>(address);
     for (int i = 0; i < n; i++)
     {
         writeMemoryPattern(ptr + (i * 4), "1F 20 03 D5");
     }
-
 }
 
 } // namespace utils

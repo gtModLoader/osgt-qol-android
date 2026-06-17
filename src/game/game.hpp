@@ -54,9 +54,10 @@ class GameHarness
     // Detours function located at target address to function located at detour address. Optionally,
     // a pointer might be passed in order to store the original (undetoured) function address.
     // Throws std::runtime_error on failure.
-    template <typename F> void hookFunction(void* target, F detour, F* original, bool hasPriority = false);
+    template <typename F> void hookFunction(void* target, F detour, F* original, bool killsOriginal = false);
 
-    template <typename F> void hookFunctionPattern(std::string& target, F detour, F* original, bool hasPriority = false);
+    template <typename F>
+    void hookFunctionPattern(std::string& target, F detour, F* original, bool killsOriginal = false);
 
     void* resolveSymbol(std::string& pattern);
 
@@ -367,12 +368,16 @@ class EventsAPI
 // TEMPLATE FUNCTION DEFINITIONS //
 ///////////////////////////////////
 
-template <typename F> void game::GameHarness::hookFunction(void* target, F detour, F* original, bool hasPriority)
+template <typename F> void game::GameHarness::hookFunction(void* target, F detour, F* original, bool killsOriginal)
 {
-    A64HookFunction(target, (void*)detour, (void**)original);
+    if (killsOriginal)
+        utils::installLossyJumpHook(target, (void*)detour);
+    else
+        A64HookFunction(target, (void*)detour, (void**)original);
 }
 
-template <typename F> void game::GameHarness::hookFunctionPattern(std::string& pattern, F detour, F* original, bool hasPriority)
+template <typename F>
+void game::GameHarness::hookFunctionPattern(std::string& pattern, F detour, F* original, bool killsOriginal)
 {
     void* target = dlsym(handle, pattern.c_str());
     if (target == nullptr)
@@ -380,5 +385,8 @@ template <typename F> void game::GameHarness::hookFunctionPattern(std::string& p
         LOG_ERROR("hookFunctionPattern failed with pattern %s", pattern.c_str());
         return;
     }
-    A64HookFunction(target, (void*)detour, (void**)original);
+    if (killsOriginal)
+        utils::installLossyJumpHook(target, (void*)detour);
+    else
+        A64HookFunction(target, (void*)detour, (void**)original);
 }

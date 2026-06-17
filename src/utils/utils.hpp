@@ -59,10 +59,13 @@ void writeMemoryPattern(void* address, const std::string& pattern);
 void fillMemory(void* address, size_t size, uint8_t value);
 
 // Shorthand for writeMemoryPattern(address, "1F 20 03 D5").
-void nopInstruction(void* address, int n=1);
+void nopInstruction(void* address, int n = 1);
 
 // Debug print out region of memory
 void readBackMemory(void* address, size_t size);
+
+// Dirty-writes hook without salvaging the original function
+void installLossyJumpHook(void* target_func, void* hook_func);
 
 template <typename T> inline T resolveAdrpAddToAddress(void* address);
 
